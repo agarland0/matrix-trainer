@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Matrix Trainer</title>
+<style>
+:root{--bg:#f6f5f2;--card:#fff;--ink:#1d1d1f;--mute:#6b6b70;--line:#e2e0da;--acc:#2f5bd3;--ok:#1f8a4c;--bad:#c0392b}
+@media (prefers-color-scheme:dark){:root{--bg:#141416;--card:#1e1e21;--ink:#ececee;--mute:#9a9aa0;--line:#333338;--acc:#7b9cff;--ok:#4cc27f;--bad:#ff6b5b}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:560px;margin:0 auto;padding:14px 14px 48px}
+h1{font-size:19px;margin:2px 0 12px}
+h2{font-size:16px;margin:0 0 8px}
+nav{display:flex;gap:6px;margin-bottom:14px}
+nav button{flex:1;padding:9px 4px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;font-weight:600;font-size:14px;cursor:pointer}
+nav button.on{background:var(--acc);color:#fff;border-color:var(--acc)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px}
+.mute{color:var(--mute);font-size:13px}
+.bar{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.pill{font-size:13px;font-weight:600;padding:4px 10px;border-radius:999px;background:var(--line)}
+.btn{padding:10px 14px;border-radius:10px;border:1px solid var(--acc);background:var(--acc);color:#fff;font-weight:600;font-size:15px;cursor:pointer}
+.btn.ghost{background:transparent;color:var(--acc)}
+.btn.sm{padding:5px 10px;font-size:13px}
+.matrix{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:#aaa;border:2px solid #333;border-radius:6px;overflow:hidden;max-width:330px;margin:0 auto}
+.matrix svg{display:block;width:100%;height:auto;background:#fff}
+.matrix.small{max-width:180px}
+.opts{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:14px auto 0;max-width:330px}
+.opt{position:relative;background:#fff;border:2px solid #c9c9c9;border-radius:8px;padding:0;cursor:pointer;overflow:hidden}
+.opt svg{display:block;width:100%;height:auto}
+.opt b{position:absolute;top:2px;left:6px;font-size:11px;color:#888}
+.opt.ok{border-color:var(--ok);outline:3px solid var(--ok)}
+.opt.bad{border-color:var(--bad);outline:3px solid var(--bad)}
+.timer{height:6px;background:var(--line);border-radius:3px;overflow:hidden;margin-bottom:10px}
+.timer i{display:block;height:100%;background:var(--acc);transition:width .25s linear}
+.timer.low i{background:var(--bad)}
+ul,ol{padding-left:20px;margin:6px 0}
+li{margin:4px 0}
+table{width:100%;border-collapse:collapse;font-size:14px}
+td,th{padding:6px 4px;border-bottom:1px solid var(--line);text-align:left}
+th{font-size:12px;color:var(--mute);font-weight:600}
+.ok-t{color:var(--ok);font-weight:700}.bad-t{color:var(--bad);font-weight:700}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.pair{display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap;margin-top:8px}
+.pair .opt{width:70px;cursor:default}
+.ex{padding:10px 0;border-bottom:1px solid var(--line)}.ex:last-child{border-bottom:0}
+.pic{color:var(--acc);font-style:normal;font-size:13px}.pic::before{content:'Picture it: ';font-weight:600}
+nav button{padding:9px 2px;font-size:13px}
+.btn[disabled]{opacity:.45;cursor:default}
+</style>
+<script data-goatcounter="https://matrix-trainer.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
+</head>
+<body>
+<div class="wrap">
+<h1>Matrix Trainer</h1>
+<nav>
+<button data-m="learn">Learn</button>
+<button data-m="practice">Practice</button>
+<button data-m="timed">Timed</button>
+<button data-m="stats">Weak</button>
+</nav>
+<div id="main"></div>
+</div>
+<script>
+// ---------- utilities ----------
+const SH=['circle','square','triangle','diamond','hexagon','pentagon','star','cross'];
+const ISH=['circle','square','triangle','diamond'];
+const FILLS=['white','gray','black','striped'];
+const FILLC={white:'#ffffff',gray:'#9aa0a6',black:'#222222',striped:'url(#st)'};
+const CATS=['Attribute change','Distribution of three','Count / arithmetic','Rotation','Movement','Overlay','Frequency','Mirror','Construction'];
+const POS=[[14,14],[50,14],[86,14],[86,50],[86,86],[50,86],[14,86],[14,50]];
+const FIGP=[.1,.06];
+const FIGS=['<ellipse cx="50" cy="50" rx="37" ry="14"/>','<ellipse cx="50" cy="50" rx="14" ry="37"/>','<rect x="25" y="25" width="50" height="50"/>','<polygon points="50,13 83,85 17,85"/>','<circle cx="50" cy="50" r="38"/>','<polygon points="27,22 73,22 73,36 58,36 58,78 42,78 42,36 27,36"/>'].map(x=>x.replace('/>',' fill="none" stroke="#222" stroke-width="2.6" stroke-linejoin="round"/>'));
+const LINES=[[14,14,86,14],[86,14,86,86],[14,86,86,86],[14,14,14,86],[14,14,86,86],[86,14,14,86],[50,14,50,86],[14,50,86,50]];
+const MAXL=10;
+const R=n=>Math.floor(Math.random()*n);
+const pick=a=>a[R(a.length)];
+const shuf=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=R(i+1);[a[i],a[j]]=[a[j],a[i]]}return a};
+const uniq=a=>[...new Set(a)];
+const mod=(a,n)=>((a%n)+n)%n;
+const bits=m=>{let n=0;while(m){n+=m&1;m>>=1}return n};
+const randMask=()=>{const k=2+R(2);return shuf([0,1,2,3,4,5,6,7]).slice(0,k).reduce((m,b)=>m|(1<<b),0)};
+const latin=()=>{const s=1+R(2);return (r,c)=>(c+r*s)%3};
+const cnt=n=>n===1?'':'s';
+
+// ---------- rule builders ----------
+function attr(name,pool,label){return (t,vr)=>{if(vr)t=vr==="const"?"easy":"medium";const v=shuf(pool).slice(0,3);const m=x=>pool.filter(s=>s!==x);
+ if(t==='easy')return name==='fill'||name==='ifill'
+   ?{cat:'Attribute change',val:(r,c)=>v[c],text:`${label} is set by column: ${v.join(', ')}.`,mut:m}
+   :{cat:'Attribute change',val:(r,c)=>v[r],text:`${label}: each row repeats one value.`,mut:m};
+ const L=latin();return{cat:'Distribution of three',val:(r,c)=>v[L(r,c)],text:`${label}: every row has one ${v[0]}, one ${v[1]} and one ${v[2]}.`,mut:m}}}
+const B={
+ shape:attr('shape',SH,'Shape'),
+ fill:attr('fill',FILLS,'Shading'),
+ ishape:attr('ishape',ISH,'Inner shape'),
+ ifill:attr('ifill',FILLS,'Inner shading'),
+ size(t,vr){if(vr)t=vr==='prog'?'easy':'medium';if(t==='easy'){const up=R(2);return{cat:'Attribute change',val:(r,c)=>up?c:2-c,text:`Size: ${up?'grows':'shrinks'} from left to right.`,mut:x=>[0,1,2].filter(s=>s!==x)}}
+  const v=shuf([0,1,2]),L=latin();return{cat:'Distribution of three',val:(r,c)=>v[L(r,c)],text:'Size: every row has one small, one medium and one large.',mut:x=>[0,1,2].filter(s=>s!==x)}},
+ rot(t,v){if(v==='odd'||(v===undefined&&t==='hard'&&Math.random()<.3)){const p=shuf([0,1,2]),a0=R(4)*90;return{cat:'Frequency',val:(r,c)=>mod(a0+(c===p[r]?180:0),360),text:'Orientation: in every row and every column, exactly one shape faces the opposite way.',mut:x=>[x+180,x+90,x-90].map(v=>mod(v,360))}}
+  const step=v!==undefined?v:t==='hard'?pick([45,-45,135,-135]):pick([90,-90]);
+  const rs=t==='hard'?pick([0,45,-45,90,-90,180]):pick([0,0,90,-90,180]);const a0=R(8)*45;const dir=x=>x>0?'clockwise':'counterclockwise';
+  return{cat:'Rotation',val:(r,c)=>mod(a0+r*rs+c*step,360),text:`Rotation: the main shape turns ${Math.abs(step)}° ${dir(step)} at each step along a row`+(rs?`, and ${Math.abs(rs)}°${Math.abs(rs)===180?'':' '+dir(rs)} at each step down a column.`:'. Each column keeps the same angle.'),
+  mut:x=>[x+step,x-step,x+180,x+90,x-90,x+45].map(v=>mod(v,360)).filter(v=>v!==x)}},
+ count(t,v){let g,text;
+  if(!v)v=t==='easy'?'up1':t==='medium'?pick(['up2','down1']):pick(['add','sub','total']);
+  const col=rs=>rs?`, and ${rs} more down each column.`:'. Each column stays the same.';
+  if(v==='up1'){const rs=R(2),b=1+R(3);g=(r,c)=>b+r*rs+c;text='Count: one more square at each step along a row'+col(rs)}
+  else if(v==='up2'){const rs=R(2),b=1+R(2);g=(r,c)=>b+r*rs+2*c;text='Count: two more squares at each step along a row'+col(rs)}
+  else if(v==='down1'){const rs=R(2),b=3+R(2);g=(r,c)=>b+r*rs-c;text='Count: one fewer square at each step along a row'+col(rs)}
+  else{let G,n=0;const cd=pick(['both','row','col']);const ok=G=>G.flat().every(x=>x>=1&&x<=8)&&(cd==='both'||v==='total'||G[2][0]!==G[0][0]+G[1][0]);
+   do{const a=1+R(5),b=1+R(4),c=1+R(4),d=1+R(4);
+    if(v==='add')G=cd==='both'?[[a,b,a+b],[c,d,c+d],[a+c,b+d,a+b+c+d]]:[[a,b,a+b],[c,d,c+d],[b,c,b+c]];
+    else if(v==='sub')G=cd==='both'?[[a+4,b,a+4-b],[c,d,c-d],[a+4-c,b-d,a+4-b-c+d]]:[[a+4,b,a+4-b],[c+3,d,c+3-d],[b+4,a,b+4-a]];
+    else{const T=6+R(4);G=[[a,b,T-a-b],[c,d,T-c-d],[T-a-c,T-b-d,a+b+c+d-T]];G.T=T}
+   }while(!ok(G)&&n++<2000);
+   const only=cd==='row'?' Only the rows do this; the columns follow no count rule.':cd==='col'?' Only the columns do this; the rows follow no count rule.':'';
+   text=v==='total'?`Count: every row and every column adds up to ${G.T}.`:cd==='col'?(v==='add'?'Count: in each column, the bottom cell = the top cell + the middle cell.':'Count: in each column, the bottom cell = the top cell minus the middle cell.')+only:cd==='row'?(v==='add'?'Count: in each row, column 3 = column 1 + column 2.':'Count: in each row, column 3 = column 1 minus column 2.')+only:v==='add'?'Count: column 3 = column 1 + column 2, and row 3 = row 1 + row 2.':'Count: column 3 = column 1 minus column 2, and row 3 = row 1 minus row 2.';
+   if(cd==='col'&&v!=='total'){const H=G;G=[0,1,2].map(r=>[0,1,2].map(c=>H[c][r]))}
+   g=(r,c)=>G[r][c]}
+  return{cat:'Count / arithmetic',val:g,text,mut:x=>[x+1,x-1,x+2,x-2].filter(v=>v>=1&&v<=8)}},
+ sides(t,v){let G,n=0;const pk=()=>pick([-2,-1,1,2]);
+  do{const a=pk(),b=pk(),c=pk(),d=pk();G=[[a,b,a+b],[c,d,c+d],[a+c,b+d,a+b+c+d]]}
+  while((G.flat().some(x=>Math.abs(x)>4)||!(G[0][0]*G[0][1]<0||G[1][0]*G[1][1]<0)||G[2][2]===0)&&n++<3000);
+  return{cat:'Count / arithmetic',val:(r,c)=>G[r][c],text:'Signed dots: dots above the line count plus, dots below (shaded side) count minus. In each row, cell 3 = cell 1 + cell 2, so same-side dots add and opposite-side dots cancel. The same works down every column.',
+   mut:x=>[x+1,x-1,-x,x+2,x-2].filter(v=>v!==x&&Math.abs(v)<=4)}},
+ mir(t,v){const mode=v||(t==='hard'?'both':pick(['row','col']));const m0=R(2);
+  const f=mode==='row'?(r,c)=>(m0+c)%2:mode==='col'?(r,c)=>(m0+r)%2:(r,c)=>(m0+r+c)%2;
+  const text=mode==='row'?'Mirror: the shape flips left-to-right at each step along a row. Down a column it stays the same.':mode==='col'?'Mirror: the shape flips left-to-right at each step down a column. Along a row it stays the same.':'Mirror: the shape flips left-to-right at each step along a row and at each step down a column.';
+  return{cat:'Mirror',val:f,text,mut:x=>[1-x]}},
+ build(t,v){const kind=v||pick(['shape','color']);const K=kind==='shape'?3:2;
+  const enc=a=>a.reduce((s,x,i)=>s+x*Math.pow(4,i),0),dec=n=>[0,1,2,3].map(i=>Math.floor(n/Math.pow(4,i))%4);
+  const m=(p,q)=>{const A=dec(p),B=dec(q);return enc(A.map((a,i)=>a&&B[i]?(a===B[i]?a:0):(a||B[i])))};
+  const rc=()=>{const a=[0,0,0,0];shuf([0,1,2,3]).slice(0,2+R(2)).forEach(i=>a[i]=1+R(K));return enc(a)};
+  const show=(p,q)=>{const A=dec(p),B=dec(q);let same=0,diff=0;A.forEach((x,i)=>{if(x&&B[i]){if(x===B[i])same++;else diff++}});return same&&diff};
+  let G=null;for(let n=0;n<20000&&!G;n++){const a=rc(),b=rc(),c=rc(),d=rc();const g=[[a,b,m(a,b)],[c,d,m(c,d)],[m(a,c),m(b,d),0]];const x=m(g[0][2],g[1][2]);if(x!==m(g[2][0],g[2][1]))continue;g[2][2]=x;
+   if(!g.flat().every(Boolean))continue;if(n<15000&&(!show(a,b)||!show(a,c)))continue;if(new Set(g.flat()).size<7)continue;G=g}
+  if(!G)G=[[1,4,5],[16,64,80],[17,68,85]];
+  const ra=dec(G[2][0]),rb=dec(G[2][1]);
+  const traps=[enc(ra.map((a,i)=>a||rb[i])),enc(rb.map((b,i)=>b||ra[i])),enc(ra.map((a,i)=>a&&rb[i]&&a===rb[i]?0:(a||rb[i])))];
+  const text=kind==='shape'?'Merge: in each row, cell 3 combines cells 1 and 2 corner by corner. A shape on its own carries over, two matching shapes merge into one, and two different shapes cancel out. The same works down every column.':'Merge: in each row, cell 3 combines cells 1 and 2 corner by corner. A dot on its own carries over, two dots of the same colour merge into one, and a black dot meeting a white dot cancels out. The same works down every column.';
+  return{cat:'Overlay',kind,val:(r,c)=>G[r][c],text,
+   mut:x=>{const A=dec(x),out=[...traps];for(let i=0;i<4;i++)for(let v=0;v<=K;v++)if(v!==A[i]){const B=A.slice();B[i]=v;out.push(enc(B))}return uniq(out.filter(v=>v&&v!==x))}}},
+ hide(t,v){const st=v!==undefined?v:pick([1,2,-1]);const cs=pick([0,1,2]);const p0=R(5);const n=x=>`${Math.abs(x)} position${cnt(Math.abs(x))}`;
+  return{cat:'Movement',val:(r,c)=>mod(p0+r*cs+c*st,5),text:`Hidden square: a small square moves ${n(st)} ${st>0?'right':'left'} at each step along a row (wrapping round to the other side)`+(cs?`, and ${n(cs)} right at each step down a column.`:'. Each column keeps the same position.')+' When it passes behind the big shape it is hidden, not gone.',
+   mut:x=>[x+1,x-1,x+2,x-2].map(v=>mod(v,5)).filter(v=>v!==x)}},
+ nest(t,v){const S=['circle','square','triangle','diamond','hexagon','star'];const pool=shuf(S),X=pool.slice(0,3),Y=pool.slice(3,6);
+  const idx=x=>S.indexOf(x)+1,code=(o,i)=>o*10+i;
+  const val=(r,c)=>r===0?code(idx(X[c]),0):r===1?code(idx(Y[c]),0):code(idx(Y[c]),idx(X[c]));
+  return{cat:'Construction',val,text:'Construction (nesting): down each column, cell 3 puts the shape from cell 1 inside the shape from cell 2. Along each row, each shape appears once.',
+   mut:x=>{const o=Math.floor(x/10),i=x%10;const alt=[code(i,o),code(o,0)];if(i)alt.push(code(i,0));X.concat(Y).forEach(z=>{const k=idx(z);if(k!==i)alt.push(code(o,k));if(k!==o)alt.push(code(k,i))});return uniq(alt.filter(v=>v!==x&&Math.floor(v/10)>0))}}},
+ spokes(t,v){const mode=v||(t==='hard'?'opp':'same');const p0=R(8),rd=pick([1,-1]),cd=mode==='opp'?-rd:rd;const nm=d=>d>0?'clockwise':'counterclockwise';
+  const val=(r,c)=>{let a=p0,b=p0;const add=(k,d)=>{for(let j=0;j<k;j++){if(d>0)b++;else a--}};add(c,rd);add(r,cd);let m=0;for(let k=a;k<=b;k++)m|=1<<mod(k,8);return m};
+  const text=mode==='same'?`Spokes: one spoke is added at each step along a row and at each step down a column, always on the ${nm(rd)} end.`:`Spokes: along a row a spoke is added on the ${nm(rd)} end; down a column it is added on the ${nm(cd)} end.`;
+  return{cat:'Count / arithmetic',val,text,mut:x=>{const r1=((x<<1)|(x>>7))&255,r2=((x>>1)|((x&1)<<7))&255;return uniq([r1,r2,x|r1,x|r2,x&r1,x&r2].filter(v=>v&&v!==x))}}},
+ ngon(t,v){const mode=v||(t==='hard'?'both':pick(['row','col']));const n0=3+R(mode==='both'?2:3);
+  const f=mode==='row'?(r,c)=>n0+c:mode==='col'?(r,c)=>n0+r:(r,c)=>n0+r+c;
+  const text=mode==='row'?'Sides: the shape gains one side at each step along a row. Down a column it stays the same.':mode==='col'?'Sides: the shape gains one side at each step down a column. Along a row it stays the same.':'Sides: the shape gains one side at each step along a row and one more at each step down a column.';
+  return{cat:'Attribute change',val:f,text,mut:x=>[x+1,x-1,x+2,x-2].filter(v=>v>=3&&v<=8&&v!==x)}},
+ pos(t,v){return mover(t,'Dot',v)},
+ pos2(t,v){return mover('hard','Ring',v)},
+ lines(t,v,nb,dir){nb=nb||8;dir=dir||(t==='hard'?pick(['row','col','row','both']):pick(['row','col','both']));const fig=nb===6;const rm=()=>{const k=2+R(2);return shuf([...Array(nb).keys()]).slice(0,k).reduce((m,b)=>m|(1<<b),0)};const op=v||(t==='hard'?pick(['xor','sub','and','rsub']):'or');
+  const f={or:(a,b)=>a|b,xor:(a,b)=>a^b,sub:(a,b)=>a&~b,and:(a,b)=>a&b,rsub:(a,b)=>b&~a}[op];
+  let G=null;const inf=(p,q)=>op==='or'?(p&~q)&&(q&~p):op==='and'?(p&~q)&&(q&~p)&&(p&q):op==='xor'?(p&q)&&(p&~q|q&~p):(p&q)&&(op==='sub'?(p&~q):(q&~p));
+  for(let n=0;n<4000&&!G;n++){const a=rm(),b=rm(),c=rm(),d=rm();let g;
+   if(dir==='both'){g=[[a,b,f(a,b)],[c,d,f(c,d)],[f(a,c),f(b,d),0]];const x=f(g[0][2],g[1][2]);if(x!==f(g[2][0],g[2][1]))continue;g[2][2]=x}
+   else{const e=rm(),h=rm();g=[[a,b,f(a,b)],[c,d,f(c,d)],[e,h,f(e,h)]];if(!inf(e,h)||!inf(c,d))continue}
+   if(!g.flat().every(Boolean))continue;
+   if(!inf(a,b)||(dir==='both'&&!inf(a,c)))continue;if(new Set(g.flat()).size<7)continue;G=g}
+  if(!G)G=fig?[[3,6,f(3,6)||5],[12,24,f(12,24)||48],[f(3,12)||9,f(6,24)||18,f(f(3,6)||5,f(12,24)||48)||33]]:[[1,2,f(1,2)||4],[8,16,f(8,16)||32],[f(1,8)||64,f(2,16)||128,3]];
+  const same=dir==='both'?' The same rule also works down every column.':dir==='row'?' Only the rows do this. The columns follow no overlay rule, so don\'t look for one there.':' Only the columns do this. The rows follow no overlay rule.';
+  const ftext={or:'Outlines: in each row, cell 3 holds every outline from cells 1 and 2, drawn on top of each other.',xor:'Outlines: in each row, cell 3 keeps outlines that appear in only one of cells 1 and 2. Outlines in both cancel out.',sub:'Outlines: in each row, cell 3 = cell 1 with any outline also in cell 2 removed.',rsub:'Outlines: in each row, cell 3 = cell 2 with any outline also in cell 1 removed (reversed subtraction).',and:'Outlines: in each row, cell 3 keeps only the outlines that appear in both cells 1 and 2.'};
+  const text0={or:'Lines: in each row, cell 3 shows every line from cells 1 and 2 combined.',xor:'Lines: in each row, cell 3 keeps lines that appear in only one of cells 1 and 2. Shared lines cancel out.',sub:'Lines: in each row, cell 3 = cell 1 with any line also in cell 2 removed.',rsub:'Lines: in each row, cell 3 = cell 2 with any line also in cell 1 removed (reversed subtraction).',and:'Lines: in each row, cell 3 keeps only the lines that appear in both cells 1 and 2 (intersection).'};let text=(fig?ftext:text0)[op];if(dir==='col')text=text.replace('in each row','in each column').replace('cell 3','the bottom cell').replace('cells 1 and 2','the top two cells').replace('cell 1','the top cell').replace('cell 2','the middle cell');text+=same+(fig?' The outlines overlap, so first name each one (oval, square, triangle…), then run the check one outline at a time.':'');
+  return{cat:'Overlay',val:dir==='col'?(r,c)=>G[c][r]:(r,c)=>G[r][c],src:dir==='col'?[[0,2],[1,2]]:[[2,0],[2,1]],text,trap:true,
+   mut:x=>{const m=[];for(let i=0;i<nb;i++)m.push(x^(1<<i));return m.filter(v=>v&&v!==x)}}},
+ figs(t,v,d){return B.lines(t,v,6,d)}
+};
+function mover(t,label,v){const step=v!==undefined?v:t==='hard'?pick([2,-2,3,-3]):pick([1,-1]);
+ const rs=t==='hard'?pick([0,1,-1,2,-2,4]):pick([0,0,2,-2,4]);const p0=R(8);const d=x=>x>0?'clockwise':'counterclockwise';const n=x=>`${Math.abs(x)} position${cnt(Math.abs(x))}`;
+ return{cat:'Movement',val:(r,c)=>mod(p0+r*rs+c*step,8),text:`${label}: moves ${n(step)} ${d(step)} around the edge at each step along a row`+(rs?`, and ${n(rs)}${Math.abs(rs)===4?' (to the opposite side)':' '+d(rs)} at each step down a column.`:'. Each column keeps the same position.'),
+ mut:x=>[x+step,x-step,x+1,x-1,x+4].map(v=>mod(v,8)).filter(v=>v!==x)}}
+// swap rows/columns in a rule (the rule runs down columns instead of along rows)
+function transpose(u){const v=u.val;u.val=(r,c)=>v(c,r);
+ u.text=u.text.replace(/\b(rows?|columns?)\b|left to right/g,w=>({row:'column',rows:'columns',column:'row',columns:'rows','left to right':'top to bottom'})[w]);
+ u.text=u.text.replace('down each row','along each row').replace('Along each column','Down each column');
+ return u}
+
+// Rule keys that read oddly: 'sides' is signed counting (dots above the line add, below subtract);
+// 'ngon' is sides progression (the shape gains a corner each step). Saved sets store these keys, so they stay.
+const HAS={nest:['medium'],spokes:['medium','hard'],ngon:['medium','hard'],mir:['medium','hard'],build:['hard'],hide:['hard'],sides:['hard'],shape:['easy','medium'],fill:['easy','medium'],size:['easy','medium'],ishape:['easy','medium'],ifill:['easy','medium'],
+ rot:['medium','hard'],count:['easy','medium','hard'],pos:['medium','hard'],pos2:['hard'],lines:['medium','hard'],figs:['medium','hard']};
+const EXCL={nest:['shape','ishape','ifill','size','rot','mir','lines','sides','build','hide','count','spokes','ngon'],spokes:['shape','ishape','ifill','size','rot','mir','lines','sides','build','hide','count','pos','pos2','ngon'],ngon:['shape','rot','mir','lines','sides','build'],mir:['shape','ishape','ifill','lines','sides','build','hide'],build:['lines','sides','count','shape','fill','size','rot','ishape','ifill','pos2','hide'],hide:['size','lines','sides','count','rot','pos','pos2'],sides:['lines','count','shape','fill','size','rot','ishape','ifill'],lines:['shape','fill','size','rot','ishape','ifill','figs'],figs:['shape','fill','size','rot','ishape','ifill','nest','spokes','ngon','mir','build','hide','sides'],rot:['shape','ishape','ifill'],count:['pos','pos2']};
+const compat=(a,b)=>!((EXCL[a]||[]).includes(b)||(EXCL[b]||[]).includes(a));
+const LV={1:{n:1,m:0,h:0,easy:1},2:{n:2,m:0,h:0,easy:1},3:{n:2,m:1,h:0},4:{n:3,m:1,h:0,tp:.3},
+ 5:{n:3,m:1,h:1,tp:.4},6:{n:4,m:1,h:1,tp:.4},7:{n:4,m:2,h:2,tp:.5},8:{n:5,m:2,h:2,tp:.5},9:{n:5,m:1,h:3,tp:.5},10:{n:5,m:2,h:3,tp:.5,allHard:1}};
+
+// ---------- options: balanced so the answer is never the "most typical" option ----------
+function product(dims){let out=[{}];for(const d of dims){const nx=[];for(const o of out)for(const v of d.vals)nx.push(Object.assign({},o,{[d.feat]:v}));out=nx}return out}
+
+// Balanced answer options (levels 5-10):
+// near-misses (one detail off), copies of other grid figures, and blends of a nearby figure into the answer.
+// The answer ties for "most typical" in about a third of puzzles, like those examples, and is never unique on any attribute.
+// Answer-option versions. Saved timed sets made before these times used older options and are labelled as such.
+// v2 removed option-only shortcuts; v3 stopped easy rules from ruling out wrong answers.
+const OPTIONS_V2_SINCE=Date.parse('2026-11-06T18:46:00Z'),OPTIONS_V3_SINCE=Date.parse('2026-11-06T21:14:00Z');
+const OPTW={n:6,r:12,t:6},OPT_Q=.6;
+function uniqBy(a,k){const s=new Set();return a.filter(o=>{const x=k(o);if(s.has(x))return false;s.add(x);return true})}
+function balancedOptions(ans,rules,level,cells){
+ const J=x=>JSON.stringify(x),F=rules.map(u=>u.feat),key=o=>F.map(f=>J(o[f])).join('|'),ak=key(ans);
+ const alt=u=>uniq(u.mut(ans[u.feat])).filter(x=>J(x)!==J(ans[u.feat]));
+ const gridKeys=new Set(cells.flat().slice(0,8).map(key)),ansInGrid=gridKeys.has(ak);
+ const gv=f=>new Set(cells.flat().slice(0,8).map(c=>J(c[f])));
+ // wrong values only from what the grid shows, whenever the answer's own value is visible there (otherwise unseen values give the answer away)
+ const A=rules.map(u=>{const m=alt(u);if(u.feat==='lines'||u.feat==='figs')return m.slice(0,4);const g=gv(u.feat),pref=m.filter(x=>g.has(J(x)));if(level>=4&&g.has(J(ans[u.feat]))&&pref.length)return shuf(pref).slice(0,4);return uniq([...shuf(pref),...shuf(m)]).slice(0,4)});
+ const pool=[];const add=o=>{const k=key(o);if(k===ak)return;if(!ansInGrid&&gridKeys.has(k))return;pool.push(o)};
+ rules.forEach((u,i)=>A[i].forEach(x=>add(Object.assign({},ans,{[u.feat]:x}))));                       // near-misses
+ [[2,1],[1,2],[2,0],[0,2],[1,1]].forEach(([r,c])=>{const o=cells[r][c],d=F.filter(f=>J(o[f])!==J(ans[f]));if(d.length<2)return;  // blends: parts of a nearby figure
+  for(let i=0;i<4;i++){const x=Object.assign({},ans);shuf(d).slice(0,2+(d.length>3&&Math.random()<.4?1:0)).forEach(f=>x[f]=o[f]);add(x)}});
+ for(let i=0;i<60;i++){const x=Object.assign({},ans),k=2+R(2);shuf(rules.map((u,j)=>j)).slice(0,k).forEach(j=>{if(A[j].length)x[F[j]]=pick(A[j])});add(x)}  // decoy clusters
+ const P=uniqBy(pool,key);if(P.length<5)return null;
+ const needF=pk=>{let best=99;for(let m=0;m<(1<<F.length);m++){const S=F.filter((f,i)=>m>>i&1);if(S.length>=best)continue;if(pk.every(o=>S.some(f=>J(o[f])!==J(ans[f]))))best=S.length}return best};
+ const tT=R(6),tH=R(6),pos=(sc)=>sc.filter(v=>v>sc[0]).length,ties=sc=>sc.filter(v=>v===sc[0]).length-1;
+ let best=null,bs=-1e9;
+ for(let t=0;t<2500;t++){const pk=shuf(P).slice(0,5),all=[ans,...pk],V=F.filter(f=>all.some(o=>J(o[f])!==J(ans[f])));
+  const C={};V.forEach(f=>{C[f]={};all.forEach(o=>C[f][J(o[f])]=(C[f][J(o[f])]||0)+1)});
+  if(V.length>1&&V.some(f=>C[f][J(ans[f])]===1))continue;
+  const T=all.map(o=>V.reduce((q,f)=>q+C[f][J(o[f])],0));
+  const H=all.map(o=>all.filter(c=>c!==o&&V.filter(f=>J(o[f])!==J(c[f])).length===1).length);
+  const w=window.OW||OPTW,sc=w.n*needF(pk)-w.r*Math.abs(pos(T)-tT)-w.r*Math.abs(pos(H)-tH)-w.t*ties(T)-w.t*ties(H);
+  if(sc>bs){bs=sc;best=pk}}
+ return best?best.map(o=>Object.assign({},ans,o)):null}
+// Top levels (9-10): "cube" options. Three rules (the hardest that can be balanced) each get one wrong value; the six
+// options are six corners of the 2x2x2 cube those values span, so you must work out two or three of those hard rules.
+// Every other attribute matches the answer in all six options, so the easy rules give nothing away.
+// Fairness: a corner layout is drawn first and the answer's corner second, with no corner chosen more than 20% of the
+// time for any layout, so no rule-free shortcut (most typical, most neighbours, odd one out, any other) can beat 20%.
+// Each wrong value is matched to the answer's value on how often it shows in the grid, in row 3 and in column 3, and
+// numeric wrong values go up or down at random, so grid-counting and "bigger/smaller" tells stay at chance too.
+let OPTSTRICT=false; // practice and timed puzzles regenerate rather than use the older option builder; library examples may fall back
+const CUBE={lv:5,cap:.2,lam:.3,fav:4,gh:.8};
+function cubeOptions(ans,rules,level,cells){
+ const J=x=>JSON.stringify(x),TW={easy:1,medium:2,hard:3};
+ const g8=cells.flat().slice(0,8),row3=[cells[2][0],cells[2][1]],col3=[cells[0][2],cells[1][2]];
+ const NUMF={count:1,size:1,ngon:1,sides:1,lines:2,figs:2,spokes:2,ma:3,mb:3,mc:3};
+ const nv=(f,x)=>NUMF[f]===2?bits(x):NUMF[f]===3?x%3:f==='sides'?Math.abs(x):x;
+ const prof=(f,x)=>[g8,row3,col3].map(S=>S.filter(c=>J(c[f])===J(x)).length);
+ // per rule: wrong values whose grid profile matches the answer's, split by direction for numeric attributes
+ const F=[];rules.forEach(u=>{const f=u.feat,a=ans[f],pa=prof(f,a);
+  const m=uniq(u.mut(a).map(J)).filter(s=>s!==J(a)).map(s=>JSON.parse(s));
+  const c=m.map(x=>{const px=prof(f,x);return{x,c:4*Math.abs(px[0]-pa[0])+Math.abs(px[1]-pa[1])+Math.abs(px[2]-pa[2])+((px[0]>0)!==(pa[0]>0)?20:0),d:NUMF[f]?Math.sign(nv(f,x)-nv(f,a)):0}});
+  const best=dir=>{const ok=c.filter(o=>o.d===0||o.d===dir);if(!ok.length)return null;const mn=Math.min(...ok.map(o=>o.c));return{c:mn,xs:ok.filter(o=>o.c===mn).map(o=>o.x)}};
+  const up=best(1),dn=best(-1);if(!up||!dn)return;const cost=Math.max(up.c,dn.c);if(cost>=20)return;
+  F.push({f,w:TW[u.tier]||2,cost,pickW:()=>pick((Math.random()<.5?up:dn).xs)})});
+ if(F.length<3)return null;
+ // candidate triples: heaviest first, then best-matched
+ const tri=[];for(let i=0;i<F.length;i++)for(let j=i+1;j<F.length;j++)for(let k=j+1;k<F.length;k++){const T=[F[i],F[j],F[k]];tri.push({T,s:T.reduce((s,d)=>s+d.w,0)-CUBE.lam*T.reduce((s,d)=>s+d.cost,0)-CUBE.fav*T.filter(d=>d.cost>=4).length+Math.random()*.01})}
+ tri.sort((a,b)=>b.s-a.s);
+ // a corner that copies a grid cell can't be a wrong option (it would be struck out for free), so it must be one of the two left out
+ let got=null;
+ for(const {T} of tri.slice(0,6)){for(let tr=0;tr<8;tr++){
+  const wv=T.map(d=>d.pickW());const vx=v=>{const o=Object.assign({},ans);T.forEach((d,i)=>{if(v>>i&1)o[d.f]=wv[i]});return o};
+  const ck=o=>g8.some(c=>T.every(d=>J(c[d.f])===J(o[d.f])));
+  if(ck(ans))continue;const C=[1,2,3,4,5,6,7].filter(v=>ck(vx(v)));if(C.length>2)continue;
+  if(!got||C.length<got.C.length)got={T,vx,C};if(!C.length)break}if(got)break}
+ if(!got)return null;const {T,vx,C}=got;
+ // isolation cost of corner t inside corner set S (weights = rule tiers)
+ const H=(S,t)=>{let b=1e9;for(let m=1;m<8;m++){const c=T.reduce((s,d,i)=>s+(m>>i&1?d.w:0),0);if(c>=b)continue;if(S.every(v=>v===t||((v^t)&m)))b=c}return b};
+ // each six-corner layout: capped chance for each corner to hold the answer (no corner above CUBE.cap), and the expected cost
+ const lay=[];for(let p=0;p<8;p++)for(let q=p+1;q<8;q++){const S=[0,1,2,3,4,5,6,7].filter(v=>v!==p&&v!==q);const h=S.map(t=>H(S,t));
+  const ord=[...new Set(h)].sort((a,b)=>b-a);const qv=S.map(()=>0);let left=1;
+  for(const lv of ord){const ix=S.map((t,i)=>i).filter(i=>h[i]===lv),give=Math.min(left,CUBE.cap*ix.length);ix.forEach(i=>qv[i]=give/ix.length);left-=give;if(left<=1e-9)break}
+  lay.push({S,q0:S.includes(0)?qv[S.indexOf(0)]:0,E:S.reduce((s,t,i)=>s+qv[i]*h[i],0)})}
+ // layouts are weighted by their own expected cost (the same whichever corner is the answer), times the answer corner's capped chance
+ const mx=Math.max(...lay.map(l=>l.E)),ok=lay.filter(l=>l.q0>0&&!C.some(v=>l.S.includes(v)));if(!ok.length)return null;
+ const wt=ok.map(l=>Math.exp(8*(l.E-mx))*l.q0);let r=Math.random()*wt.reduce((a,b)=>a+b,0),i=0;for(;i<ok.length-1;i++){r-=wt[i];if(r<0)break}
+ return ok[i].S.filter(v=>v!==0).map(vx)}
+function buildOptions(ans,rules,decoys,level,cells){
+ level=level||5;if(level>=CUBE.lv&&cells){if(rules.length>=3){const c=cubeOptions(ans,rules,level,cells);if(c)return c}if(OPTSTRICT)return null}
+ if(level>=2&&cells&&rules.length>=2){const a=balancedOptions(ans,rules,level,cells);if(a)return a}const nr=rules.length;
+ const KN={off:1,wTop:20,wTie:6,wNeed:5};const target=nr<=1?1:level>=5?Math.max(2,nr-KN.off):Math.min(2,nr);
+ const wide=level>=5&&nr>=2;
+ const dims=rules.map(u=>{const m=uniq(u.mut(ans[u.feat]));const solo=nr===1&&['lines','figs','sides','build','spokes','nest'].includes(u.feat);return{feat:u.feat,rule:1,vals:[ans[u.feat],...(solo?m.slice(0,5):shuf(m.slice(0,5)).slice(0,wide?3:2))]}}).filter(d=>d.vals.length>1);
+ let n=dims.reduce((p,d)=>p*d.vals.length,1);
+ for(const d of shuf(decoys)){if(n>=(wide?12:18))break;dims.push(d);n*=d.vals.length}
+ const key=o=>dims.map(d=>o[d.feat]).join('|');const ak=key(ans);
+ const pool0=product(dims).filter(o=>key(o)!==ak);if(pool0.length<5)return null;
+ const dist0=o=>dims.reduce((s,d)=>s+(o[d.feat]!==ans[d.feat]?1:0),0);
+ const near2=pool0.filter(o=>dist0(o)<=2);const pool=(wide&&near2.length>=8&&Math.random()<.85)?near2:pool0;
+ const dist=o=>dims.reduce((s,d)=>s+(o[d.feat]!==ans[d.feat]?1:0),0);
+ const R_=dims.filter(d=>d.rule).map(d=>d.feat),D_=dims.filter(d=>!d.rule).map(d=>d.feat);
+ // fewest rules a solver must work out before only the answer is left (options that break a constant feature are free to rule out)
+ const need=pk=>{const live=pk.filter(o=>D_.every(f=>o[f]===ans[f]));if(!live.length)return 0;let best=99;const k=R_.length;
+  for(let m=1;m<(1<<k);m++){const S=R_.filter((f,i)=>m>>i&1);if(S.length>=best)continue;if(live.every(o=>S.some(f=>o[f]!==ans[f])))best=S.length}return best};
+ let best=null,bs=1e9;const tries=level>=5?3000:500;
+ for(let t=0;t<tries;t++){const pickd=shuf(pool).slice(0,5);const all=[ans,...pickd];let s=0;
+  for(const d of dims){const c={};all.forEach(o=>c[o[d.feat]]=(c[o[d.feat]]||0)+1);const ca=c[ans[d.feat]];
+   const others=Object.entries(c).filter(([k])=>k!==String(ans[d.feat])).map(([,v])=>v);const mx=Math.max(0,...others);
+   if(ca>mx)s+=(wide?0.5:4)*(ca-mx); // answer's value is the most common (light weight when we need near-misses)
+   if(ca===1&&dims.length>1)s+=2;  // answer's value is unique: odd one out
+  }
+  const tot=all.map(o=>dims.reduce((q,d)=>q+all.filter(x=>x[d.feat]===o[d.feat]).length,0));
+  const ta=tot[0],mn=Math.min(...tot),mxT=Math.max(...tot);
+  if(ta<=mn)s+=3;if(ta>=mxT)s+=wide?(tot.filter(v=>v===mxT).length===1?KN.wTop:KN.wTie):3;   // answer must never be the single most typical option overall
+  const near=pickd.filter(o=>dist(o)===1).length;if(near<2)s+=2-near; // keep a couple of tempting near-misses
+  s+=KN.wNeed*Math.max(0,target-need(pickd)); // you must solve nearly every rule before only one option is left
+  if(s<bs){bs=s;best=pickd;if(s===0)break}}
+ return best.map(o=>Object.assign({},ans,o));
+}
+
+function assemble(ch,rules,level){
+  const rotShape=pick(['arrow','flag']);
+  const base={shape:ch.includes('mir')?'flag':ch.includes('rot')?rotShape:ch.includes('hide')?pick(['circle','square','hexagon']):pick(SH),mir:0,build:0,hide:0,nest:0,spokes:0,ngon:3,fill:pick(['white','white','gray']),size:1,rot:0,count:0,pos:0,pos2:0,lines:0,figs:0,sides:0,mpos:0,ma:0,mb:0,mc:0,ishape:pick(ISH),ifill:'black'};
+  const flags={nest:ch.includes('nest'),spokes:ch.includes('spokes'),ngon:ch.includes('ngon'),hide:ch.includes('hide'),build:(rules.find(u=>u.feat==='build')||{}).kind||false,sides:ch.includes('sides'),shape:!ch.includes('mpos')&&!ch.includes('lines')&&!ch.includes('figs')&&!ch.includes('sides')&&!ch.includes('build')&&!ch.includes('nest')&&!ch.includes('spokes'),inner:ch.includes('ishape')||ch.includes('ifill'),count:ch.includes('count'),pos:ch.includes('pos'),pos2:ch.includes('pos2'),lines:ch.includes('lines'),figs:ch.includes('figs'),multi:ch.includes('mpos')};
+  const cells=[];for(let r=0;r<3;r++){cells.push([]);for(let c=0;c<3;c++){const x=Object.assign({},base);rules.forEach(u=>x[u.feat]=u.val(r,c));cells[r].push(x)}}
+  const ans=cells[2][2];
+  // overlay traps: the other combinations of the two source cells
+  rules.filter(u=>u.feat==='lines'||u.feat==='figs').forEach(u=>{const S_=u.src||[[2,0],[2,1]];const sa=u.val(...S_[0]),sb=u.val(...S_[1]);
+   const traps=[sa|sb,sa^sb,sa&sb,sa&~sb,sb&~sa].filter(v=>v&&v!==ans[u.feat]);const old=u.mut;u.mut=x=>uniq([...traps,...old(x)])});
+  const decoys=[];
+  if(flags.shape){if(!ch.includes('fill'))decoys.push({feat:'fill',vals:[ans.fill,...FILLS.filter(v=>v!==ans.fill)]});
+   if(!ch.includes('size'))decoys.push({feat:'size',vals:[ans.size,...[0,2].filter(v=>v!==ans.size)]});
+   if(!ch.includes('shape')&&!ch.includes('rot')&&!ch.includes('mir')&&!ch.includes('ngon'))decoys.push({feat:'shape',vals:[ans.shape,...shuf(SH.filter(v=>v!==ans.shape)).slice(0,2)]});}
+  if(flags.count&&!ch.includes('count'))decoys.push({feat:'count',vals:[ans.count,ans.count+1]});
+  const ds=buildOptions(ans,rules,decoys,level,cells);if(!ds)return null;
+  const opts=shuf([ans,...ds]);
+  return{level,cells,flags,opts,correct:opts.indexOf(ans),rules,cats:[...new Set(rules.map(u=>u.cat))]};
+}
+function demo(feat,v,tp){OPTSTRICT=false;if(feat==='multi')return genMulti(v);for(let i=0;i<50;i++){const fs=feat==='pos2'?['pos','pos2']:feat==='mirrot'?['rot','mir']:[feat];
+ const rules=fs.map(f=>{const u=Object.assign({feat:f,tier:'medium'},B[f](f==='pos'&&feat==='pos2'?'medium':'medium',f==='pos'&&feat==='pos2'?1:v));return tp?transpose(u):u});
+ const P=assemble(fs,rules,0);if(P)return P}}
+const FOCUS={all:null,construction:['nest','build'],overlay:['lines','figs','build'],count:['count','sides'],rotation:['rot','mir'],movement:['pos','pos2','hide'],inner:['ishape','ifill']};const MINL={inner:5,multi:5};
+function gen(level,focus,opt){opt=opt||{};OPTSTRICT=true;
+ if(MINL[focus]&&level<MINL[focus])level=MINL[focus];
+ if(focus==='multi'||((!focus||focus==='all')&&level>=5&&Math.random()<MULTP[level])){const M=genMulti(level);if(M)return M}
+ const ff=focus&&FOCUS[focus];if(ff&&level<3&&!ff.some(f=>HAS[f].includes('easy')))level=3;
+ const cfg=LV[level];
+ for(let t=0;t<400;t++){
+  let pool=shuf(Object.keys(HAS));if(cfg.easy)pool=pool.filter(f=>HAS[f].includes('easy'));
+  pool=pool.filter(f=>!(f==='pos2'&&level<6)&&!((f==='ishape'||f==='ifill')&&level<5)&&!(f==='sides'&&level<7)&&!(f==='mir'&&level<4)&&!((f==='nest'||f==='spokes'||f==='ngon')&&level<3)&&!(f==='build'&&level<5)&&!(f==='hide'&&level<6)&&!(f==='figs'&&level<5));
+  if(opt.timed)pool=pool.filter(f=>f!=='sides'&&f!=='mir');
+  if(!ff&&level>=8&&Math.random()<.5)pool=pool.filter(f=>f!=='pos'&&f!=='pos2');
+  if(!ff&&level>=7&&Math.random()<(level>=9?1:.3)){const inn=shuf(['ishape','ifill']).filter(f=>pool.includes(f)).slice(0,level>=9?1:2);pool=[...inn,...pool.filter(f=>!inn.includes(f))]}
+  if(!ff&&level>=6&&Math.random()<FIGP[level>=9?1:0])pool=['figs',...pool.filter(f=>f!=='figs')];
+  if(!ff&&level>=CUBE.lv&&Math.random()<CUBE.gh){const GH=['rot','count','pos','pos2','hide','mir','ngon','lines','figs','build','sides','spokes'];pool=[...pool.filter(f=>GH.includes(f)),...pool.filter(f=>!GH.includes(f))]}
+  let fx=null;if(ff){const ok=ff.filter(f=>pool.includes(f));if(!ok.length)continue;fx=pick(ok);pool=[fx,...pool.filter(f=>f!==fx)]}
+  const ch=[];for(const f of pool){if(ch.length>=cfg.n)break;if(ch.every(g=>compat(f,g)))ch.push(f)}
+  const need=((ch.includes('lines')||ch.includes('figs'))&&!cfg.easy)?Math.min(cfg.n,2):cfg.allHard?cfg.n:(ch.includes('build')||ch.includes('spokes'))?Math.min(cfg.n,2):ch.includes('sides')?Math.min(cfg.n,3):(ch.includes('lines')&&!cfg.easy)?Math.min(cfg.n,2):cfg.n;
+  if(ch.length<need)continue;
+  if(fx&&!ch.includes(fx))continue;
+  let nh=Math.min(cfg.h,ch.filter(f=>HAS[f].includes('hard')).length>=cfg.h?cfg.h:99),nm=(ch.includes('lines')||ch.includes('figs')||ch.includes('sides')||ch.includes('build')||ch.includes('spokes'))?0:cfg.m;const tiers={};
+  for(const f of shuf(ch)){const o=HAS[f];let tr;
+   if(cfg.easy)tr='easy';
+   else if(f===fx&&o.includes('hard')&&Math.random()<.7){tr='hard';if(nh>0)nh--}
+   else if(nh>0&&o.includes('hard')){tr='hard';nh--}
+   else if(nm>0&&o.includes('medium')){tr='medium';nm--}
+   else tr=(cfg.allHard&&o.includes('hard'))?'hard':pick(o.filter(x=>x!=='hard'||level>=5));
+   tiers[f]=tr}
+  if(nh>0||nm>0)continue;
+  const rules=ch.map(f=>{const u=Object.assign({feat:f,tier:tiers[f]},B[f](tiers[f]));return(cfg.tp&&Math.random()<cfg.tp&&['shape','fill','size','ishape','ifill','nest'].includes(f))?transpose(u):u});
+  const P=assemble(ch,rules,level);if(!P)continue;return P;
+ }
+ return gen(Math.max(1,level-1),focus,opt);
+}
+
+// ---------- multi-figure puzzles: three separate figures per cell; match them up, then track each one ----------
+const MSET={easy:['circle','triangle','square'],hard:[['square','diamond','circle'],['square','diamond','triangle'],['diamond','square','hexagon']]};
+const MSLOT=[[30,30],[70,30],[50,71]],MSZ=[10,13,16];
+const MNAME={circle:'Circle',triangle:'Triangle',square:'Square',diamond:'Diamond',hexagon:'Hexagon',pentagon:'Pentagon'};
+const MULTP={5:.1,6:.12,7:.15,8:.15,9:.18,10:.18};
+function mfig(kind,name){
+ const fills=shuf([0,1,2,3]).slice(0,3),fs=fills.map(i=>FILLS[i]),f0=pick([0,1,2,3]),s0=pick([0,1,2]),enc=(f,s)=>f*3+s;
+ let val,text,cat='Attribute change';
+ if(kind==='const'){val=()=>enc(f0,s0);text=`${name}: stays the same in every cell.`}
+ else if(kind==='fillRow'){val=(r,c)=>enc(fills[r],s0);text=`${name}: shading is the same along each row and changes from row to row.`}
+ else if(kind==='fillCol'){val=(r,c)=>enc(fills[c],s0);text=`${name}: shading is the same down each column and changes from column to column.`}
+ else if(kind==='sizeRow'){const up=Math.random()<.5;val=(r,c)=>enc(f0,up?c:2-c);text=`${name}: ${up?'grows':'shrinks'} one size at each step along a row. Each column keeps the same size.`}
+ else if(kind==='sizeCol'){const up=Math.random()<.5;val=(r,c)=>enc(f0,up?r:2-r);text=`${name}: ${up?'grows':'shrinks'} one size at each step down a column. Each row keeps the same size.`}
+ else if(kind==='fillDist'){const a=pick([1,2]);val=(r,c)=>enc(fills[(c+a*r)%3],s0);text=`${name}: every row and every column has one ${fs[0]}, one ${fs[1]} and one ${fs[2]}.`;cat='Distribution of three'}
+ else{const a=pick([1,2]),up=Math.random()<.5;val=(r,c)=>enc(fills[(c+a*r)%3],up?r:2-r);text=`${name}: every row and every column has one ${fs[0]}, one ${fs[1]} and one ${fs[2]}, and it ${up?'grows':'shrinks'} one size at each step down a column.`;cat='Distribution of three'}
+ return{cat,val,text,kind,mut:x=>{const f=Math.floor(x/3),s=x%3,m=[];[0,1,2,3].forEach(g=>{if(g!==f)m.push(enc(g,s))});[s-1,s+1].forEach(t=>{if(t>=0&&t<=2)m.push(enc(f,t))});return shuf(m)}}}
+function mposRule(tier){const kc=pick([1,2]),kr=tier==='hard'?pick([1,2]):0;
+ const d=k=>k===1?'one spot clockwise':'two spots clockwise (one spot counterclockwise)';
+ return{cat:'Movement',val:(r,c)=>(c*kc+r*kr)%3,text:`Positions: the three figures sit on three spots (top left, top right, bottom) and move ${d(kc)} at each step along a row${kr?`, and ${d(kr)} at each step down a column`:'. Each column keeps the same arrangement'}. Match each figure by its shape before checking anything else.`,mut:x=>[0,1,2].filter(v=>v!==x)}}
+function genMulti(level){level=Math.max(5,Math.min(10,level));
+ for(let t=0;t<200;t++){
+  const shapes=shuf(level>=8?pick(MSET.hard):MSET.easy),names=shapes.map(s=>MNAME[s]);
+  const pool=level>=9?['fillDist','both','sizeRow','sizeCol','fillRow','fillCol']:level>=7?['fillDist','sizeRow','sizeCol','fillRow','fillCol']:['sizeRow','fillRow','fillCol','sizeCol'];
+  const nR=level>=9?3:level>=7?2:1;let kinds=shuf(pool).slice(0,nR);while(kinds.length<3)kinds.push('const');kinds=shuf(kinds);
+  const tp=level>=7?'hard':'medium';
+  const rules=[Object.assign({feat:'mpos',tier:tp},mposRule(tp)),...kinds.map((k,i)=>Object.assign({feat:['ma','mb','mc'][i],tier:k==='const'?'easy':'medium'},mfig(k,names[i])))];
+  const ans={};rules.forEach(u=>ans[u.feat]=u.val(2,2));
+  // correspondence traps: give a figure the look another figure should have
+  rules.slice(1).forEach(u=>{const others=['ma','mb','mc'].filter(g=>g!==u.feat).map(g=>ans[g]).filter(v=>v!==ans[u.feat]);const old=u.mut;u.mut=x=>uniq([...others,...old(x)])});
+  const keep=OPTSTRICT;if(level<7)OPTSTRICT=false;const P=assemble(['mpos','ma','mb','mc'],rules,level);OPTSTRICT=keep;if(P){P.flags.mshapes=shapes;return P}}
+ return null}
+
+// ---------- drawing ----------
+function shapeEl(s,cx,cy,r,fill,rot,stroke,mir){
+ stroke=stroke||'#222';
+ const st=`fill="${FILLC[fill]}" stroke="${stroke}" stroke-width="2.5" stroke-linejoin="round"`;
+ const P=a=>`<polygon points="${a.map(p=>(cx+p[0]*r).toFixed(1)+','+(cy+p[1]*r).toFixed(1)).join(' ')}" ${st}/>`;
+ const poly=(n,off,sx=1)=>{const a=[];for(let i=0;i<n;i++){const t=off+i*2*Math.PI/n;a.push([Math.cos(t)*sx,Math.sin(t)])}return a};
+ const star=()=>{const a=[];for(let i=0;i<10;i++){const t=-Math.PI/2+i*Math.PI/5,k=i%2?.45:1.05;a.push([Math.cos(t)*k,Math.sin(t)*k])}return a};
+ const G=inner=>`<g transform="rotate(${rot} ${cx} ${cy})${mir?` translate(${2*cx} 0) scale(-1 1)`:''}">${inner}</g>`;
+ if(/^ngon\d/.test(s))return P(poly(+s.slice(4),-Math.PI/2).map(p=>[p[0]*1.05,p[1]*1.05+.05]));
+ switch(s){
+  case'circle':return`<circle cx="${cx}" cy="${cy}" r="${(r*.9).toFixed(1)}" ${st}/>`;
+  case'square':return P(poly(4,Math.PI/4).map(p=>[p[0]*1.1,p[1]*1.1]));
+  case'triangle':return P(poly(3,-Math.PI/2).map(p=>[p[0]*1.1,p[1]*1.1+.12]));
+  case'diamond':return P(poly(4,-Math.PI/2,.72));
+  case'hexagon':return P(poly(6,0));
+  case'pentagon':return P(poly(5,-Math.PI/2).map(p=>[p[0]*1.02,p[1]*1.02+.06]));
+  case'star':return P(star());
+  case'cross':return P([[-.32,-.95],[.32,-.95],[.32,-.32],[.95,-.32],[.95,.32],[.32,.32],[.32,.95],[-.32,.95],[-.32,.32],[-.95,.32],[-.95,-.32],[-.32,-.32]]);
+  case'arrow':return G(P([[0,-1],[.72,-.1],[.28,-.1],[.28,.95],[-.28,.95],[-.28,-.1],[-.72,-.1]]));
+  case'flag':return G(P([[-.62,-.95],[.75,-.95],[.75,-.35],[-.05,-.35],[-.05,.95],[-.62,.95]]));
+ }
+}
+function cellSVG(c,f){
+ let s='';
+ if(f.lines){const Y=y=>f.count?(14+(y-14)*.75).toFixed(1):y;for(let i=0;i<8;i++)if(c.lines>>i&1){const L=LINES[i];s+=`<line x1="${L[0]}" y1="${Y(L[1])}" x2="${L[2]}" y2="${Y(L[3])}" stroke="#222" stroke-width="3.2" stroke-linecap="round"/>`}}
+ if(f.figs){const g=f.count?'<g transform="translate(12.5 0) scale(.75)">':'<g>';s+=g;for(let i=0;i<6;i++)if(c.figs>>i&1)s+=FIGS[i];s+='</g>'}
+ if(f.multi&&f.mshapes){['ma','mb','mc'].forEach((k,i)=>{const v=c[k],[x,y]=MSLOT[(i+c.mpos)%3];s+=shapeEl(f.mshapes[i],x,y,MSZ[v%3],FILLS[Math.floor(v/3)],0)})}
+ if(f.nest){const S=['circle','square','triangle','diamond','hexagon','star'];const o=Math.floor(c.nest/10),i=c.nest%10;
+  if(o){s+=shapeEl(S[o-1],50,50,i?30:26,c.fill,0);if(i)s+=shapeEl(S[i-1],50,i===3?54:52,11,'white',0,c.fill==='black'?'#fff':'#222')}}
+ if(f.spokes){for(let k=0;k<8;k++)if(c.spokes>>k&1){const a=k*Math.PI/4-Math.PI/2;s+=`<line x1="${(50+10*Math.cos(a)).toFixed(1)}" y1="${(50+10*Math.sin(a)).toFixed(1)}" x2="${(50+36*Math.cos(a)).toFixed(1)}" y2="${(50+36*Math.sin(a)).toFixed(1)}" stroke="#222" stroke-width="3.2" stroke-linecap="round"/>`}
+  s+=`<circle cx="50" cy="50" r="8" fill="${FILLC[c.fill]}" stroke="#222" stroke-width="2.5"/>`}
+ if(f.build){const P=[[32,32],[68,32],[32,68],[68,68]];for(let i=0;i<4;i++){const v=Math.floor(c.build/Math.pow(4,i))%4;if(!v)continue;const [x,y]=P[i];
+  if(f.build==='color')s+=`<circle cx="${x}" cy="${y}" r="11" fill="${v===2?'#222':'#fff'}" stroke="#222" stroke-width="2.5"/>`;
+  else s+=shapeEl(['','circle','square','triangle'][v],x,y,12,'white',0)}}
+ if(f.sides){s+=`<polygon points="86,14 86,86 14,86" fill="#e6e6e6"/><line x1="14" y1="86" x2="86" y2="14" stroke="#222" stroke-width="2.5"/>`;const up=[[30,30],[48,24],[24,48],[42,42]],dn=[[70,70],[52,76],[76,52],[58,58]];const v=c.sides||0;(v>0?up:dn).slice(0,Math.abs(v)).forEach(([x,y])=>s+=`<circle cx="${x}" cy="${y}" r="5" fill="#222"/>`)}
+ if(f.shape){const cy=f.count?42:50;const rs=f.inner?(f.count?[15,18,22]:[18,22,27]):(f.count?[11,16,21]:[13,19,26]);const rr=rs[c.size];
+  if(f.hide){const X=[14,30,50,70,86][c.hide];s+=`<rect x="${X-7}" y="${cy-7}" width="14" height="14" fill="#222"/>`}
+  s+=shapeEl(f.ngon?'ngon'+c.ngon:c.shape,50,cy,rr,c.fill,c.rot,undefined,c.mir);
+  if(f.inner)s+=shapeEl(c.ishape,50,cy,Math.max(6,rr*.42),c.ifill,0,c.fill==='black'?'#fff':'#222')}
+ if(f.count){const n=c.count,g=Math.floor((n-1)/4),w=n*10-2+g*6,x0=50-w/2;for(let i=0;i<n;i++)s+=`<rect x="${x0+i*10+Math.floor(i/4)*6}" y="80" width="8" height="8" fill="#222"/>`}
+ if(f.pos2){const p=POS[c.pos2];s+=`<circle cx="${p[0]}" cy="${p[1]}" r="9" fill="none" stroke="#222" stroke-width="2.5"/>`}
+ if(f.pos){const p=POS[c.pos];s+=`<circle cx="${p[0]}" cy="${p[1]}" r="5.5" fill="#222"/>`}
+ const defs=s.includes('url(#st)')?'<defs><pattern id="st" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="#fff"/><rect width="2.5" height="6" fill="#222"/></pattern></defs>':'';
+ return`<svg viewBox="0 0 100 100" aria-hidden="true">${defs}${s}</svg>`;
+}
+const QSVG='<svg viewBox="0 0 100 100"><text x="50" y="64" text-anchor="middle" font-size="40" font-family="sans-serif" fill="#999">?</text></svg>';
+function matrixHTML(p,small){if(!p.cells&&p.cells9)p=Object.assign({},p,{cells:[p.cells9.slice(0,3),p.cells9.slice(3,6),p.cells9.slice(6,9)]});let h=`<div class="matrix${small?' small':''}">`;for(let r=0;r<3;r++)for(let c=0;c<3;c++)h+=(r===2&&c===2)?QSVG:cellSVG(p.cells[r][c],p.flags);return h+'</div>'}
+function optsHTML(p){return'<div class="opts">'+p.opts.map((o,i)=>`<button class="opt" data-i="${i}"><b>${'ABCDEF'[i]}</b>${cellSVG(o,p.flags)}</button>`).join('')+'</div>'}
+
+
+const PICS=[
+ [/^Shape: each (row|column) repeats/,'Each row is a team wearing its own uniform.'],
+ [/^Shading is set by/,'Each column was painted from its own paint can.'],
+ [/^Size: (grows|shrinks)/,'Like a zoom lens clicking one notch per cell.'],
+ [/^(Shape|Inner shape): every/,'Sudoku with three symbols: each one used once per row and once per column.'],
+ [/^(Shading|Inner shading): every/,'Three paint pots, each used exactly once per row and column.'],
+ [/^Inner shading is set by/,'Each column was painted from its own paint can.'],
+ [/^Inner shape: each/,'Each row is a team wearing its own uniform.'],
+ [/^Size: every/,'Small, medium and large coffee cups: one of each per row.'],
+ [/^Count: one more/,'A counter clicking up by one each cell.'],
+ [/^Count: two more/,'Climbing stairs two at a time.'],
+ [/^Count: one fewer/,'A countdown.'],
+ [/= (column|row) 1 \+/,'Pour cups 1 and 2 into cup 3.'],
+ [/^Count: (column|row) 3 = (column|row) 1 minus/,'Start with pile 1, take away pile 2. What is left is pile 3.'],
+ [/^Count: every (row|column) adds up/,'Every row gets the same budget. The last cell spends whatever is left.'],
+ [/^Construction \(nesting\)/,'Nesting dolls: the first shape is placed inside the second.'],
+ [/^Spokes/,'A clock face filling in: watch which end each new spoke is added to.'],
+ [/^Sides:/,'Count the corners: triangle, square, pentagon. Each step adds a corner.'],
+ [/^Mirror:/,'Left hand vs right hand: no amount of turning makes one into the other. If turning can\'t get you there, it\'s a flip.'],
+ [/two matching shapes merge/,'Two stamps on the same spot: matching stamps line up into one, clashing stamps smudge to nothing.'],
+ [/same colour merge/,'Paint on paint: the same colour stays, black meeting white cancels to blank.'],
+ [/^Hidden square/,'A car driving behind a building: when you can\'t see it, it\'s still on the road.'],
+ [/dots above the line count plus/,'Money in and out: dots above the line are deposits, dots below are withdrawals. Same side adds, opposite sides cancel.'],
+ [/exactly one shape faces the opposite way/,'A line of soldiers where one always faces backwards: one per row, one per column.'],
+ [/turns 90°/,'A clock hand jumping a quarter turn.'],
+ [/turns 45°/,'A compass needle stepping N, NE, E: an eighth of a turn each time.'],
+ [/turns 135°/,'Three eighths of a turn. Looks random until you measure the angle.'],
+ [/^Dot: moves 1 position/,'A runner lapping the edge of the cell, one stop per cell.'],
+ [/^Dot: moves [23] positions/,'Hopscotch around the edge, skipping stops. Count the stops, don\'t eyeball.'],
+ [/^Ring:/,'A second runner on the same track with its own pace. Track each runner on its own.'],
+ [/shows every line from/,'Stack two tracing sheets and trace everything you see.'],
+ [/keeps only the lines that appear in both/,'Stack two tracing sheets and keep only the lines where the ink is doubled.'],
+ [/only one of/,'Stack two tracing sheets. Wherever ink is doubled it cancels; every single line stays.'],
+ [/reversed subtraction/,'Same eraser, flipped: cell 1 rubs lines out of cell 2.'],
+ [/with any line also in/,'Cell 2 is an eraser rubbed over cell 1. The eraser leaves nothing of its own behind.']
+];
+function picOf(u){const t=u.text;const hit=PICS.find(([re])=>re.test(t));let p=hit?hit[1]:'';return p}
+function ruleHTML(u){const p=picOf(u);return`${u.text}${p?`<br><i class="pic">${p}</i>`:''}`}
+
+// ---------- stats (per-browser only) ----------
+function loadStats(){try{return JSON.parse(localStorage.getItem('mt_stats'))||{a:{},m:{}}}catch(e){return{a:{},m:{}}}}
+function saveStats(s){try{localStorage.setItem('mt_stats',JSON.stringify(s))}catch(e){}}
+let STATS=loadStats();
+const FPRE={shape:/^Shape/,fill:/^Shading/,ishape:/^Inner shape/,ifill:/^Inner shading/,size:/^Size/,rot:/^(Rotation|Orientation)/,pos:/^Dot/,pos2:/^Ring/,count:/^Count/,sides:/^Signed/,ngon:/^Sides/,hide:/^Hidden/,lines:/^Lines/,figs:/^Outlines/,mpos:/^Positions/,mir:/^(Mirror|Flip)/,spokes:/^Spokes/,nest:/^(Nest|Construction)/,build:/^(Merge|Partial|Construction)/};
+function wrongCats(p,pick){if(pick==null||!p.opts||!p.opts[pick])return p.cats;const a=p.opts[p.correct],b=p.opts[pick];
+ const ks=Object.keys(a).filter(k=>JSON.stringify(a[k])!==JSON.stringify(b[k]));const out=new Set();
+ ks.forEach(k=>{const u=p.rules.find(r=>r.feat===k)||p.rules.find(r=>FPRE[k]&&FPRE[k].test(r.text));if(u)out.add(u.cat)});return out.size?[...out]:p.cats}
+function record(p,ok,pick){p.cats.forEach(c=>{STATS.a[c]=(STATS.a[c]||0)+1});if(!ok)wrongCats(p,pick).forEach(c=>{STATS.m[c]=(STATS.m[c]||0)+1});saveStats(STATS)}
+
+// ---------- app ----------
+const main=document.getElementById('main');
+let mode='learn',timerId=null;
+const PR={level:3,auto:true,p:null,done:false,n:0,ok:0,focus:'all'};
+const TS={on:false,i:0,level:3,res:[],p:null,dl:0};
+function setMode(m){mode=m;clearInterval(timerId);document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.m===m));render()}
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>setMode(b.dataset.m));
+
+function render(){({learn:rLearn,practice:rPractice,timed:rTimed,stats:rStats})[mode]()}
+
+
+
+const EXP=(()=>{const P='#222',M='#999';
+const circ=(x,y,r)=>`<circle cx="${x}" cy="${y}" r="${r}" fill="none" stroke="${P}" stroke-width="1.5"/>`;
+const sq=(x,y,r)=>`<rect x="${x-r}" y="${y-r}" width="${2*r}" height="${2*r}" fill="none" stroke="${P}" stroke-width="1.5"/>`;
+const tri=(x,y,r)=>`<polygon points="${x},${y-r} ${x+r},${y+r*.8} ${x-r},${y+r*.8}" fill="none" stroke="${P}" stroke-width="1.5"/>`;
+const arrow=(x,y,a)=>`<g transform="rotate(${a} ${x} ${y})"><polygon points="${x},${y-12} ${x+8},${y-2} ${x+3},${y-2} ${x+3},${y+11} ${x-3},${y+11} ${x-3},${y-2} ${x-8},${y-2}" fill="none" stroke="${P}" stroke-width="1.5"/></g>`;
+const dots=(x,y,n)=>{let s='';const w=n*8-3;for(let i=0;i<n;i++)s+=`<rect x="${x-w/2+i*8}" y="${y-2}" width="5" height="5" fill="${P}"/>`;return s};
+const C=[[-13,-13],[13,-13],[13,13],[-13,13]];
+const dot=(x,y,k)=>`<circle cx="${x+C[k][0]}" cy="${y+C[k][1]}" r="4" fill="${P}"/>`;
+const L={t:[-14,-14,14,-14],r:[14,-14,14,14],b:[-14,14,14,14],l:[-14,-14,-14,14],d:[-14,-14,14,14]};
+const lines=(x,y,ks)=>ks.split('').map(k=>{const v=L[k];return`<line x1="${x+v[0]}" y1="${y+v[1]}" x2="${x+v[2]}" y2="${y+v[3]}" stroke="${P}" stroke-width="2" stroke-linecap="round"/>`}).join('');
+const grid=fn=>{let s='';for(let r=0;r<3;r++)for(let c=0;c<3;c++){const x=c*40+20,y=r*40+20;s+=`<rect x="${c*40}" y="${r*40}" width="40" height="40" fill="#fff" stroke="#aaa" stroke-width="0.5"/>`;s+=(r==2&&c==2)?`<text x="${x}" y="${y+6}" text-anchor="middle" font-size="16" fill="${M}">?</text>`:fn(r,c,x,y)}return`<svg width="120" height="120" viewBox="0 0 120 120">${s}</svg>`};
+const one=fn=>`<svg width="40" height="40" viewBox="0 0 40 40"><rect width="40" height="40" fill="#fff" stroke="#1f8a4c" stroke-width="2"/>${fn(20,20)}</svg>`;
+const sh=[circ,sq,tri];
+const R=[
+ ['1. Attribute change','One property shifts in steps. Here size grows left to right in every row.',(r,c,x,y)=>circ(x,y,[5,9,13][c]),(x,y)=>circ(x,y,13)],
+ ['2. Distribution of three','Each row and column has each of three values once: circle, square, triangle.',(r,c,x,y)=>sh[(c+r)%3](x,y,10),(x,y)=>tri(x,y,10)],
+ ['3. Count / arithmetic','The number of items rises by one per step, across rows and down columns. Row 3 goes 3, 4, so the answer is 5.',(r,c,x,y)=>dots(x,y,r+c+1),(x,y)=>dots(x,y,5)],
+ ['4. Rotation','The arrow turns 90° clockwise each step. Row 3 points down, then left, so next is up.',(r,c,x,y)=>arrow(x,y,(r*90+c*90)%360),(x,y)=>arrow(x,y,0)],
+ ['5. Movement','The dot moves one corner clockwise each step. Row 3: bottom-left, top-left, so top-right.',(r,c,x,y)=>dot(x,y,(r+c+1)%4),(x,y)=>dot(x,y,1)],
+ ['6. Overlay (XOR)','Cell 3 keeps lines that appear in only one of cells 1 and 2. Shared lines cancel. It works down the columns too.',(r,c,x,y)=>{const g=[['tl','tr','lr'],['bd','bl','dl'],['tlbd','trbl','?']];return lines(x,y,g[r][c])},(x,y)=>lines(x,y,'rd')]];
+return R.map(([t,d,f,a])=>`<div class="ex"><b>${t}</b><p class="mute" style="margin:2px 0 8px">${d}</p><div class="row">${grid(f)}<span class="mute">answer</span>${one(a)}</div></div>`).join('');})();
+
+const LIB=[
+ {h:'Attribute change',n:'One property stays fixed or changes steadily. Look at a single property across the row. Shading can be white, gray, black or striped. Shape can progress by number of sides.',items:[['ng1','Sides: the shape gains a corner each step','ngon','row'],['ng2','Sides grow along rows and down columns','ngon','both'],
+  ['ac1','Same within a row','shape','const'],['ac2','Shading set by column','fill','const'],['ac3','Size steps up or down','size','prog'],['ac4','Same rule, running down columns','size','prog',1]]},
+ {h:'Distribution of three',n:'Three values, each once per row and once per column, like a sudoku. Find which value is missing from row 3.',items:[
+  ['d1','Three shapes','shape','latin'],['d2','Three shadings','fill','latin'],['d3','Three sizes','size','latin']]},
+ {h:'Count / arithmetic',n:'Count the squares in every cell first. Then test: steady step? sum? difference? fixed total?',items:[
+  ['c1','+1 each step','count','up1'],['c2','+2 each step','count','up2'],['c3','−1 each step','count','down1'],['c4','Column 3 = column 1 + column 2','count','add'],['c5','Column 3 = column 1 − column 2','count','sub'],['c6','Every row and column has the same total','count','total'],['c8','Signed dots: above the line adds, below subtracts','sides'],['sp1','Spokes: added on the same end both ways','spokes','same'],['sp2','Spokes: one end along rows, the other end down columns','spokes','opp']]},
+ {h:'Rotation and mirror',n:'Track where one tip or corner points. Measure the turn between cells 1 and 2, then apply it again. If no amount of turning gets you from one cell to the next, it is a mirror flip: check whether the shape changed hands.',items:[
+  ['r1','90° clockwise','rot',90],['r2','90° counterclockwise','rot',-90],['r3','45° steps','rot',45],['r4','135° steps','rot',135],['r5','Odd one out: one shape per row and column faces the other way','rot','odd'],['mi1','Mirror flip along each row','mir','row'],['mi2','Mirror flip both ways (checkerboard)','mir','both'],['mi3','Mirror and rotation together','mirrot']]},
+ {h:'Movement',n:'Number the 8 edge positions in your head. Count how many places the marker jumps, and in which direction.',items:[
+  ['m1','1 step clockwise','pos',1],['m2','1 step counterclockwise','pos',-1],['m3','2 steps','pos',2],['m4','3 steps','pos',3],['m5','Two markers moving independently','pos2',-2],['m6','Hidden, not gone: the square passes behind the shape','hide']]},
+ {h:'Overlay',n:'Compare cells 1 and 2 line by line. Sort each line into: in both, only in 1, only in 2. The answer keeps one or more of those groups. Fused outlines are the same four checks on whole shapes stacked on one centre: name each outline first (oval, tall oval, square, triangle, circle, T), then sort them the same way. In research item sets these are the hardest items: only 34–46% of adults solved them.',items:[
+  ['o1','Addition (OR): everything from both','lines','or'],['o2','Intersection (AND): only lines in both','lines','and'],['o3','Subtraction: column 1 minus column 2','lines','sub'],['o5','Reversed subtraction: column 2 minus column 1','lines','rsub'],['o4','XOR: lines in only one (shared cancel)','lines','xor'],['o6','Partial merge (shapes): matching merge, clashing cancel','build','shape'],['o7','Partial merge (colours): same colour merges, black + white cancel','build','color'],
+  ['of1','Fused outlines, Add: every outline from both','figs','or'],['of2','Fused outlines, Shared: only outlines in both','figs','and'],['of3','Fused outlines, Cancel: outlines in only one','figs','xor'],['of4','Fused outlines, Subtract: column 1 minus column 2','figs','sub'],['of5','Fused outlines, reversed Subtract: column 2 minus column 1','figs','rsub']]},
+ {h:'Several separate figures',n:'Three figures per cell, each with its own identity. First match them up by shape (they move between spots), then track each one: position, shading, size. Wrong answers often swap one figure\'s look onto another.',items:[
+  ['mf1','Figures rotate between spots; one changes shading','multi',5],['mf2','Positions shift along rows and down columns; two figures change','multi',7],['mf3','Look-alike shapes, every figure follows its own rule','multi',9]]},
+ {h:'Construction',n:'Cell 3 is built from cells 1 and 2. Full construction keeps everything from both (the same as Add). Nesting puts one shape inside the other. Partial construction keeps only the parts that pass a rule (merge, or the Subtract / Shared / Cancel checks). Often construction runs in one direction and a different rule runs in the other.',items:[
+  ['cn1','Nesting: cell 1 goes inside cell 2','nest'],['cn2','Full construction: everything carries over','lines','or'],['cn3','Partial construction: matching parts merge, clashing parts cancel','build','shape']]}
+];
+const LIBP={};
+function libItem(it){const [id,title,feat,v,tp]=it;const p=LIBP[id]||(LIBP[id]=demo(feat,v,tp));
+ return`<div class="ex" id="li-${id}"><b>${title}</b><div class="row" style="margin-top:8px;align-items:center">${matrixHTML(p,true).replace('class="matrix small"','class="matrix small" style="margin:0;max-width:150px"')}
+ <div><div class="mute">answer</div><div class="opt ok" style="width:56px;cursor:default">${cellSVG(p.opts[p.correct],p.flags)}</div></div></div>
+ <p class="mute" style="margin:6px 0">${p.rules.map(ruleHTML).join('<br>')}</p><button class="btn sm ghost" data-another="${id}">Show another</button></div>`}
+const OVL=(()=>{const f={lines:true},c=(m,l)=>`<div style="text-align:center"><div class="opt" style="width:64px;cursor:default">${cellSVG({lines:m},f)}</div><div class="mute">${l}</div></div>`;
+ return`<div class="row" style="gap:6px;margin:8px 0 4px">${c(25,'Cell 1')}${c(19,'Cell 2')}</div><div class="row" style="gap:6px">${c(27,'OR')}${c(17,'AND')}${c(10,'XOR')}${c(8,'1 − 2')}</div>
+ <p class="mute" style="margin:6px 0 0">Cell 1 and cell 2 share the top line and the diagonal. OR keeps all four lines. AND keeps only the two shared ones. XOR keeps the two unshared ones. Subtraction (1 − 2) keeps what cell 1 has that cell 2 doesn't. Think of cell 2 as an eraser rubbed over cell 1; XOR is two tracing sheets stacked, where doubled lines vanish.</p>`})();
+
+const OVFAST=`<div style="margin:10px 0 4px"><b>Your check: Add / Subtract / Shared / Cancel</b>
+<p class="mute" style="margin:4px 0">Use row 1 (it's complete). Ask which one describes cell 3:</p>
+<table><tr><th>Check</th><th>Cell 3 is…</th><th>Rule</th></tr>
+<tr><td><b>Add</b></td><td>everything from both cells</td><td>Addition (OR)</td></tr>
+<tr><td><b>Subtract</b></td><td>one cell with the other's lines erased (check both ways: 1 − 2 and 2 − 1)</td><td>Subtraction</td></tr>
+<tr><td><b>Shared</b></td><td>only the lines both cells have</td><td>Intersection (AND)</td></tr>
+<tr><td><b>Cancel</b></td><td>the differences only; shared lines vanish</td><td>XOR</td></tr></table>
+<p class="mute" style="margin:6px 0 0"><b>Cancel cross-check:</b> in a Cancel row, every line shows up in exactly two of the three cells.<br>
+<b>Try both directions:</b> the overlay may run along the rows, down the columns, or both. If row 1 fails every check, try column 1 (top two cells → bottom cell). If cell 3 has a line in neither cell 1 nor cell 2, it isn't an overlay in that direction.<br>
+<b>Same check works on dots, small shapes and whole outlines</b>, not only lines. When outlines are stacked on top of each other, list them by name for cells 1 and 2 before you compare.<br><b>Whole shapes inside each other?</b> That's nesting construction: one cell's shape goes inside the other's.<br><b>Corner parts instead of lines?</b> That's partial merge: a part on its own carries over, matching parts merge, clashing parts (different shapes, or black meeting white) cancel.</p></div>`;
+function rLibrary(){return LIB.map(g=>`<div class="card"><h2>${g.h}</h2><p class="mute" style="margin-top:0">${g.n}</p>${g.h==='Overlay'?OVFAST+'<b>Same two cells, four operations</b>'+OVL:''}${g.items.map(libItem).join('')}</div>`).join('')}
+
+function rLearnWire(){main.querySelectorAll('[data-another]').forEach(bt=>bt.onclick=()=>{const id=bt.dataset.another;delete LIBP[id];const it=LIB.flatMap(g=>g.items).find(x=>x[0]===id);document.getElementById('li-'+id).outerHTML=libItem(it);rLearnWire()})}
+function rLearn(){
+ main.innerHTML=`
+ <div class="card"><h2>The six rule types</h2><p class="mute">Beyond these six, the rule library below also covers construction (nesting and partial merge), mirror flips, hidden objects, signed counting, spokes, sides progression, striped shading, odd-one-out orientation, fused outlines (whole shapes stacked on top of each other) and multi-figure puzzles (several separate figures that move around and each follow their own rule). A rule says how something changes. An attribute is what changes: shape, shading, size, count, position, orientation or lines. Any rule can act on any attribute that fits, so shading shows up under Attribute change (light to dark across a row) and Distribution of three (one white, one gray, one black per row). Harder puzzles stack two to five rules, each on a different attribute.</p>${EXP}</div>
+ <div class="card"><h2>Rule library</h2><p class="mute" style="margin:0">Every variant of every rule, each as a single-rule puzzle with its answer. Tap "Show another" to see a fresh example of the same variant until you can spot it instantly.</p></div>${rLibrary()}
+ <div class="card"><h2>Method for every puzzle</h2><ol>
+ <li><b>Build the answer before you look at the options.</b> Strong solvers spend most of their time on the matrix and rarely flick back and forth to the answers. <b>On hard items, use the 3-step routine:</b> (1) solve the 2–3 most distinctive rules, (2) use them to knock out options, (3) check the one left against every row and column and every element, inner ones included. Building the full answer from scratch can eat the clock.</li>
+ <li>Split the cell into elements: shape, shading, size, count, dot, lines. Find one rule, lock it in, then move to the next. Juggling several rules at once is where hard puzzles fall apart.</li>
+ <li><b>Patterns run across the rows and down the columns, never diagonally</b> (the standard rule in tests of this kind). An element can follow one rule along the rows and a different one down the columns, or change in only one direction. Check both directions for every element before you trust a rule.</li>
+ <li><b>Your answer must fit every row and every column.</b> If the answer your row rule gives clashes with what the columns show, one of your rules is wrong. If something seems to appear from nowhere, re-read that element: it's following a different rule than you think.</li>
+ <li><b>Turned or flipped?</b> If no amount of turning gets you from one cell to the next, it's a mirror flip. Check whether the shape changed hands.</li>
+ <li><b>Gone or hidden?</b> If an element vanishes where a bigger shape sits, assume it's behind the shape and keep tracking its steps.</li>
+ <li><b>Built from the other cells?</b> Check for construction: everything combined, one shape nested inside another, or only some parts surviving.</li>
+ <li><b>Several separate figures in each cell?</b> Match them up first: find each figure by its shape in every cell, even when it has moved to another spot. Then track each figure on its own: where it moves, and how its shading and size change. Watch for look-alikes such as a square and a diamond (a square turned 45°). A wrong option often gives one figure the look that belongs to another.</li>
+ <li><b>Outlines stacked on top of each other?</b> Pull them apart before you test anything: name each outline in cells 1 and 2, then run Add / Subtract / Shared / Cancel one outline at a time. Seeing the separate shapes is the hard part; the rule itself is usually simple.</li>
+ <li><b>Solve the lines first.</b> An overlay check (Add / Subtract / Shared / Cancel) usually knocks out half the options, so the remaining elements are quicker to check.</li>
+ <li>Only if you can't build the full answer: use the rules you did find to rule out options. This is a fallback, not the default.</li>
+ <li><b>Never leave a blank.</b> An unanswered question counts as wrong, and you can't skip and come back. At the 30-second warning, pick your best remaining option.</li>
+ <li>Every question has its own 2-minute clock and spare time doesn't carry over. If you finish early, run the element checklist before you click: outer shape, outer shading, inner shape, inner shading, dot, ring, lines, count. Most misses at the top levels are one element left unchecked.</li>
+ <li><b>Wrong options here give nothing away.</b> From level 5 up, all six options get the easy rules right. The wrong ones differ from the answer only on the two or three hardest rules, so shape or count alone rules nothing out. You have to solve the hard rules. Picking the most typical option, the odd one out, the one with the most near-identical neighbours, or skipping options that copy a grid figure all work only about as often as a blind guess.</li></ol></div>
+ <div class="card"><h2>How to use this trainer</h2><ul>
+ <li><b>Practice:</b> untimed. Say the rule out loud, then answer. You see the rules after each puzzle.</li>
+ <li><b>Timed 20:</b> 20 puzzles, 2 minutes each, difficulty adapts to your answers. Review comes at the end.</li>
+ <li><b>Weak spots:</b> misses counted by the rule you actually got wrong, saved in this browser. Drill your top two.</li>
+ <li><b>Focus:</b> in Practice, pick one family to drill, including Inner element and Several separate figures.</li>
+ <li><b>Timed sets</b> leave out signed dots and mirror flips. They still appear in Practice and the library.</li></ul>
+ <p class="mute">Levels 1–4 cover the rule types. Levels 5–6 combine hard rules. Levels 7–8 stack four or five rules and add inner shapes and a second moving marker. Levels 9–10 are the hardest: four or five rules with up to three hard ones, fused outlines, or three separate figures with look-alike shapes that move and change on their own. From level 2 up, wrong options are built so that no shortcut beats a blind guess: most typical option, odd one out, most near-identical neighbours, skipping grid copies, or skipping unfamiliar colours and values. From level 5 up, all six options agree on the easy rules and differ only on the two or three hardest, so the easy rules rule nothing out. Two or three hard rules usually isolate the answer, and the difficulty is in finding and solving them among the look-alike figures. Newer rule types: construction by nesting, spokes and sides progression (from level 3), mirror flips (from level 4), partial merge with shapes or colours (from level 5), hidden objects (from level 6), signed counting and odd-one-out orientation (from level 7). These are original practice puzzles. They train the same skills but do not reproduce any test's items, and the trainer's levels are not test scores.</p></div>`;
+
+ main.querySelectorAll('[data-another]').forEach(bt=>bt.onclick=()=>{const id=bt.dataset.another;delete LIBP[id];const it=LIB.flatMap(g=>g.items).find(x=>x[0]===id);const el=document.getElementById('li-'+id);el.outerHTML=libItem(it);rLearnWire()});}
+
+function rPractice(){
+ if(!PR.p){PR.p=gen(PR.level,PR.focus);PR.done=false}
+ const p=PR.p;
+ main.innerHTML=`<div class="bar"><span class="pill">Level ${p.level}/${MAXL}</span>
+ <span class="row"><button class="btn sm ghost" id="dn">−</button><button class="btn sm ${PR.auto?'':'ghost'}" id="au">Auto</button><button class="btn sm ghost" id="up">+</button></span>
+ <span class="mute">${PR.ok}/${PR.n} right</span></div>
+ <div class="bar"><span class="mute">Focus</span><select id="fc" style="flex:1;padding:6px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);font-size:14px">${[['all','All rules'],['overlay','Overlay (XOR, AND, subtraction)'],['construction','Construction (nesting, merge)'],['count','Count / arithmetic'],['rotation','Rotation'],['movement','Movement'],['inner','Inner element (inner shape and shading)'],['multi','Several separate figures']].map(([k,l])=>`<option value="${k}" ${PR.focus===k?'selected':''}>${l}</option>`).join('')}</select></div>
+ <div class="card">${matrixHTML(p)}${optsHTML(p)}<div id="fb"></div></div>`;
+ setTimeout(()=>{const f=document.getElementById('fc');if(f)f.onchange=()=>{PR.focus=f.value;PR.p=null;render()}});
+ document.getElementById('dn').onclick=()=>{PR.level=Math.max(1,PR.level-1);PR.auto=false;PR.p=null;render()};
+ document.getElementById('up').onclick=()=>{PR.level=Math.min(MAXL,PR.level+1);PR.auto=false;PR.p=null;render()};
+ document.getElementById('au').onclick=()=>{PR.auto=!PR.auto;render()};
+ main.querySelectorAll('.opt').forEach(b=>b.onclick=()=>{
+  if(PR.done)return;PR.done=true;const i=+b.dataset.i,ok=i===p.correct;PR.n++;if(ok)PR.ok++;record(p,ok,i);
+  main.querySelectorAll('.opt')[p.correct].classList.add('ok');if(!ok)b.classList.add('bad');
+  document.getElementById('fb').innerHTML=`<p class="${ok?'ok-t':'bad-t'}">${ok?'Correct.':'Not this one. Answer: '+'ABCDEF'[p.correct]+'.'}</p><ul>${p.rules.map(u=>`<li>${ruleHTML(u)}</li>`).join('')}</ul><button class="btn" id="nx">Next</button>`;
+  document.getElementById('nx').onclick=()=>{if(PR.auto)PR.level=ok?Math.min(MAXL,PR.level+1):Math.max(1,PR.level-1);PR.p=null;render();window.scrollTo(0,0)};
+ });
+}
+
+// ---------- saved timed sets (artifact database, with a local copy as backup) ----------
+let DB=null,SETS=[],DBSTATE='loading',DR=null,VIEW=null;
+function ser(p){return{level:p.level,cells9:p.cells.flat(),flags:p.flags,opts:p.opts,correct:p.correct,rules:p.rules.map(u=>({text:u.text,cat:u.cat,feat:u.feat})),cats:p.cats}}
+function localSets(){try{return JSON.parse(localStorage.getItem('mt_sets'))||[]}catch(e){return[]}}
+function saveLocal(){try{localStorage.setItem('mt_sets',JSON.stringify(SETS.slice(0,40)))}catch(e){}}
+function mergeSets(list){const m=new Map(SETS.map(x=>[x.id,x]));list.forEach(x=>m.set(x.id,Object.assign({},m.get(x.id)||{},x)));SETS=[...m.values()].sort((x,y)=>y.at-x.at)}
+SETS=localSets();
+(async()=>{try{if(!(window.claude&&claude.use)){DBSTATE='local';return}
+ const t=setTimeout(()=>{if(DBSTATE==='loading'){DBSTATE='local';if(mode==='timed'&&!TS.on)render()}},10000);
+ DB=await claude.use('db');if(!DB){clearTimeout(t);DBSTATE='local';if(mode==='timed'&&!TS.on)render();return}
+ const q=await DB.collection('timed').orderBy('at','desc').limit(200).get();clearTimeout(t);
+ mergeSets(q.docs.map(d=>Object.assign({id:d.id},d.data())));DBSTATE='db';
+ for(const x of SETS)if(x.localOnly){try{const c=Object.assign({},x);delete c.localOnly;await DB.collection('timed').doc(x.id).set(c);x.localOnly=false}catch(e){}}
+ saveLocal();if(mode==='timed'&&!TS.on&&!DR)render()}catch(e){DBSTATE='local';if(mode==='timed'&&!TS.on)render()}})();
+async function saveSet(set){set.localOnly=true;SETS.unshift(set);saveLocal();
+ if(DB&&navigator.onLine!==false){try{const c=Object.assign({},set);delete c.localOnly;await DB.collection('timed').doc(set.id).set(c);set.localOnly=false}catch(e){set.localOnly=true}}
+ saveLocal()}
+async function markCleared(set,k){set.cleared=Object.assign({},set.cleared,{[k]:true});saveLocal();
+ if(DB&&!set.localOnly){try{await DB.collection('timed').doc(set.id).update({cleared:{[k]:true}})}catch(e){}}}
+function missBank(includeCleared){const out=[];SETS.forEach(st=>(st.misses||[]).forEach(m=>{if(includeCleared||!(st.cleared&&st.cleared[m.q]))out.push({st,m})}));return out}
+function fmtDate(t){const d=new Date(t);return d.toLocaleDateString(undefined,{month:'short',day:'numeric'})+' '+d.toLocaleTimeString(undefined,{hour:'2-digit',minute:'2-digit'})}
+function missCard(m,label){const p=m.p;return`<div class="card"><p><b>${label}</b> · level ${p.level} · ${m.pick===null?'timed out':'you picked '+'ABCDEF'[m.pick]}</p>${matrixHTML(p,true)}
+ <div class="pair"><div><div class="mute">Answer</div><div class="opt ok">${cellSVG(p.opts[p.correct],p.flags)}</div></div>${m.pick!==null?`<div><div class="mute">Yours</div><div class="opt bad">${cellSVG(p.opts[m.pick],p.flags)}</div></div>`:''}</div>
+ <ul>${p.rules.map(u=>`<li>${ruleHTML(u)}</li>`).join('')}</ul></div>`}
+function setHTML(st){let mc=st.missCats||{};if(st.misses&&st.misses.length&&st.misses.every(m=>m.p&&m.p.opts)){mc={};st.misses.forEach(m=>{const pk=typeof m.pick==='number'?m.pick:(m.pick!=null?'ABCDEF'.indexOf(m.pick):null);wrongCats(m.p,pk<0?null:pk).forEach(c=>mc[c]=(mc[c]||0)+1)})}const ms=Object.entries(mc).sort((a,b)=>b[1]-a[1]);
+ return`<div class="card"><h2>Result · ${fmtDate(st.at)}</h2><p><b>${st.ok}/20</b> correct · average level on questions 11–20: <b>${st.late}</b>/${MAXL} · time used ${st.mins} min</p>${st.at<OPTIONS_V2_SINCE?'<p class="mute"><b>Pre-fix set.</b> Built with older answer options (before Nov 6, 19:46) that had shortcuts: the answer could be spotted from the options alone more often than chance. This score is not comparable with later sets.</p>':st.at<OPTIONS_V3_SINCE?'<p class="mute"><b>Older options.</b> Built before Nov 6, 22:14, when easy rules could still rule out wrong answers. Top-level puzzles now take about 40% more work, so this score runs higher than a set made today.</p>':''}
+ <p class="mute">Level path: ${st.path.map(({l,o})=>`<span class="${o?'ok-t':'bad-t'}">${l}</span>`).join(' ')}</p>
+ <p class="mute">Higher late-set levels mean you held hard items. Track this number across sets; it is not a test score.</p>
+ ${ms.length?`<p><b>Misses by the rule you got wrong:</b> ${ms.map(([c,n])=>`${c} (${n})`).join(', ')}</p>`:''}
+ <p class="mute">${st.localOnly?'Saved on this device. It uploads automatically when you are back online.':'Saved permanently.'}</p>
+ <button class="btn" id="back">Back to sets</button></div>${(st.misses||[]).map(m=>missCard(m,'Q'+m.q)).join('')}`}
+function rTimed(){
+ if(TS.on){drawT();clearInterval(timerId);timerId=setInterval(tick,250);return}
+ if(DR)return drawDrill();
+ if(VIEW){const st=SETS.find(x=>x.id===VIEW);if(st){main.innerHTML=setHTML(st);document.getElementById('back').onclick=()=>{VIEW=null;render();window.scrollTo(0,0)};return}VIEW=null}
+ const bank=missBank(false),all=missBank(true);
+ const trend=SETS.slice(0,8).reverse().map(x=>x.late).join(' → ');
+ main.innerHTML=`<div class="card"><h2>Timed set</h2><p>20 puzzles, 2 minutes each. Right answers raise the difficulty, wrong ones lower it. No feedback until the end. Every set is saved permanently.</p>
+  <p class="mute">Do it in one sitting, somewhere quiet. It takes 15 to 30 minutes.</p><button class="btn" id="go">Start</button></div>
+ <div class="card"><h2>Drill my misses</h2><p>${bank.length} missed puzzle${bank.length===1?'':'s'} to clear${all.length>bank.length?` (${all.length-bank.length} already cleared)`:''}. Answer one right and it's cleared.</p>
+  <div class="row"><button class="btn" id="drill" ${bank.length?'':'disabled'}>Drill misses</button>${all.length>bank.length?'<button class="btn ghost" id="drillall">Include cleared</button>':''}</div></div>
+ <div class="card"><h2>Past sets</h2><p class="mute">${DBSTATE==='loading'?'Loading saved sets…':DBSTATE==='db'?'Saved permanently and available on every device.':'Saved database unreachable right now: showing this device\'s copy.'}</p>
+  ${trend?`<p class="mute">Late-set level trend: ${trend}</p>`:''}
+  ${SETS.length?`<table><tr><th>When</th><th>Score</th><th>Late level</th><th>Misses</th></tr>${SETS.map(x=>`<tr data-set="${x.id}" style="cursor:pointer"><td>${fmtDate(x.at)}${x.at<OPTIONS_V2_SINCE?' <span class="mute">(pre-fix)</span>':x.at<OPTIONS_V3_SINCE?' <span class="mute">(older options)</span>':''}</td><td>${x.ok}/20</td><td>${x.late}</td><td>${(x.misses||[]).length} ›</td></tr>`).join('')}</table>`:'<p>No sets yet.</p>'}</div>`;
+ document.getElementById('go').onclick=()=>{Object.assign(TS,{on:true,i:0,level:3,res:[]});nextT()};
+ const dr=document.getElementById('drill');if(dr)dr.onclick=()=>startDrill(false);
+ const da=document.getElementById('drillall');if(da)da.onclick=()=>startDrill(true);
+ main.querySelectorAll('[data-set]').forEach(tr=>tr.onclick=()=>{VIEW=tr.dataset.set;render();window.scrollTo(0,0)});
+}
+function startDrill(all){const list=shuf(missBank(all));if(!list.length)return;DR={list,i:0,done:false,ok:0};render()}
+function drawDrill(){const it=DR.list[DR.i];if(!it){main.innerHTML=`<div class="card"><h2>Drill done</h2><p>${DR.ok}/${DR.list.length} right this round.</p><button class="btn" id="fin">Back</button></div>`;document.getElementById('fin').onclick=()=>{DR=null;render()};return}
+ const src=it.m.p;const order=shuf([0,1,2,3,4,5]);const p=Object.assign({},src,{opts:order.map(k=>src.opts[k]),correct:order.indexOf(src.correct)});
+ main.innerHTML=`<div class="bar"><span class="pill">Miss ${DR.i+1}/${DR.list.length}</span><span class="mute">from ${fmtDate(it.st.at)} · level ${p.level}</span><button class="btn sm ghost" id="quit">Stop</button></div>
+ <div class="card">${matrixHTML(p)}${optsHTML(p)}<div id="fb"></div></div>`;
+ document.getElementById('quit').onclick=()=>{DR=null;render()};
+ let done=false;main.querySelectorAll('.opt').forEach(b=>b.onclick=()=>{if(done)return;done=true;const i=+b.dataset.i,ok=i===p.correct;if(ok){DR.ok++;markCleared(it.st,it.m.q)}
+  main.querySelectorAll('.opt')[p.correct].classList.add('ok');if(!ok)b.classList.add('bad');
+  document.getElementById('fb').innerHTML=`<p class="${ok?'ok-t':'bad-t'}">${ok?'Correct. Cleared.':'Not yet. Answer: '+'ABCDEF'[p.correct]+'. It stays in your bank.'}</p><ul>${p.rules.map(u=>`<li>${ruleHTML(u)}</li>`).join('')}</ul><button class="btn" id="nx">Next</button>`;
+  document.getElementById('nx').onclick=()=>{DR.i++;render();window.scrollTo(0,0)}});
+}
+function nextT(){TS.p=gen(TS.level,null,{timed:1});TS.start=Date.now();TS.dl=TS.start+120000;drawT();clearInterval(timerId);timerId=setInterval(tick,250)}
+function tick(){if(mode!=='timed'||!TS.on)return clearInterval(timerId);const left=TS.dl-Date.now();
+ const bar=document.getElementById('tb'),lab=document.getElementById('tl');
+ if(left<=0)return answerT(null);
+ if(bar){bar.style.width=(left/1200)+'%';bar.parentNode.classList.toggle('low',left<20000)}
+ if(lab){const s=Math.ceil(left/1000);lab.textContent=Math.floor(s/60)+':'+String(s%60).padStart(2,'0')}}
+function drawT(){const p=TS.p;
+ main.innerHTML=`<div class="bar"><span class="pill">Q ${TS.i+1}/20</span><span class="pill" id="tl">2:00</span></div>
+ <div class="timer"><i id="tb" style="width:100%"></i></div><div class="card">${matrixHTML(p)}${optsHTML(p)}</div>`;
+ main.querySelectorAll('.opt').forEach(b=>b.onclick=()=>answerT(+b.dataset.i));tick()}
+function answerT(i){clearInterval(timerId);const p=TS.p,ok=i===p.correct;
+ TS.res.push({p,pick:i,ok,t:Math.min(120,(Date.now()-TS.start)/1000)});record(p,ok,i);
+ TS.level=ok?Math.min(MAXL,TS.level+1):Math.max(1,TS.level-1);TS.i++;
+ if(TS.i>=20){TS.on=false;const r=TS.res,late=r.slice(10);const missCats={};r.filter(x=>!x.ok).forEach(x=>wrongCats(x.p,x.pick).forEach(c=>missCats[c]=(missCats[c]||0)+1));
+  const at=Date.now(),set={id:'s'+at,at,ok:r.filter(x=>x.ok).length,late:+(late.reduce((s,x)=>s+x.p.level,0)/late.length).toFixed(1),mins:Math.round(r.reduce((s,x)=>s+x.t,0)/60),
+   path:r.map(x=>({l:x.p.level,o:x.ok?1:0})),missCats,misses:r.map((x,k)=>x.ok?null:{q:k+1,pick:x.pick,p:ser(x.p)}).filter(Boolean),cleared:{}};
+  VIEW=set.id;saveSet(set).then(()=>{if(mode==='timed'&&VIEW===set.id)render()});render()}else nextT();window.scrollTo(0,0)}
+function rStats(){
+ const rows=CATS.map(c=>{const a=STATS.a[c]||0,m=STATS.m[c]||0;return{c,a,m,r:a?m/a:0}}).sort((x,y)=>y.r-x.r||y.a-x.a);
+ main.innerHTML=`<div class="card"><h2>Weak spots</h2><p class="mute">Every practice and timed puzzle counts toward each rule type it used. Saved in this browser only.</p>
+ <table><tr><th>Rule type</th><th>Seen</th><th>Missed</th><th>Miss rate</th></tr>
+ ${rows.map(x=>`<tr><td>${x.c}</td><td>${x.a}</td><td>${x.m}</td><td>${x.a?Math.round(x.r*100)+'%':'–'}</td></tr>`).join('')}</table>
+ <p style="margin-top:12px">Drill the top two in Practice: set the level by hand and keep going until you see each rule type a few times.</p>
+ <button class="btn ghost" id="rs">Reset stats</button><span id="rsc"></span></div>`;
+ document.getElementById('rs').onclick=()=>{document.getElementById('rsc').innerHTML=' <button class="btn sm" id="rs2">Tap to confirm</button>';
+  document.getElementById('rs2').onclick=()=>{STATS={a:{},m:{}};saveStats(STATS);render()}};
+}
+setMode('learn');
+
+// offline support: upload anything saved while offline as soon as the connection is back
+let syncBusy=false;const withTO=(pr,ms=15000)=>Promise.race([pr,new Promise((_,j)=>setTimeout(()=>j(new Error('timeout')),ms))]);
+async function syncPending(){if(!DB||syncBusy||navigator.onLine===false)return;syncBusy=true;let ch=false;
+ try{for(const x of SETS)if(x.localOnly){try{const c=Object.assign({},x);delete c.localOnly;await withTO(DB.collection('timed').doc(x.id).set(c));x.localOnly=false;ch=true}catch(e){}}
+  if(ch){saveLocal();if(mode==='timed'&&!TS.on)render()}}finally{syncBusy=false}}
+window.addEventListener('online',()=>setTimeout(syncPending,1500));setInterval(syncPending,60000);
+</script>
+</body>
+</html>
