@@ -12,7 +12,7 @@
 //             "left cell, changed the way the diagonal changes into the cell above", pick the best match.
 //             This is real solving, not a tell. A high rate means the puzzle is easy.
 //
-// Usage: node tools/checker.js [--n 300] [--seed 20261111] [--mode timed|practice] [--type rings] [--md] [--all] [--gate]
+// Usage: node tools/checker.js [--n 300] [--seed 20261111] [--mode timed|practice] [--type rings|cutouts] [--md] [--all] [--gate]
 //   --md    print a Markdown table (for the README)
 //   --gate  exit with an error if an option-only shortcut beats GATE at levels 5 to 10
 'use strict';
@@ -68,6 +68,14 @@ const INK = {
   nest: x => (x % 10 ? 1 : 0),
   ma: x => DARK[FILL4[Math.floor(x / 3)]] + x % 3, mb: x => DARK[FILL4[Math.floor(x / 3)]] + x % 3, mc: x => DARK[FILL4[Math.floor(x / 3)]] + x % 3,
 };
+// cutouts: ink is black area, which depends on the base shapes and the black-white swap together
+const CUT_IN = [(x, y) => (x - 50) ** 2 + (y - 50) ** 2 < 33 * 33, (x, y) => x > 32 && x < 68 && y > 32 && y < 68, (x, y) => x > 41 && x < 59 && y > 4 && y < 96, (x, y) => x > 4 && x < 96 && y > 41 && y < 59, (x, y) => y < 41];
+const cutMemo = {};
+function cutArea(mask, inv) {
+  const k = mask * 2 + inv; if (cutMemo[k] !== undefined) return cutMemo[k];
+  let n = 0; for (let x = 1; x < 100; x += 2) for (let y = 1; y < 100; y += 2) { let b = inv; for (let i = 0; i < 5; i++) if (mask >> i & 1 && CUT_IN[i](x, y)) b ^= 1; n += b; }
+  return (cutMemo[k] = n);
+}
 const SIZE = { count: 1, size: 1, ngon: 1, sides: 1, lines: 1, figs: 1, spokes: 1, ringo: 1, ringi: 1, ringc: 1 };
 
 function optionOnly(P) {
@@ -78,7 +86,7 @@ function optionOnly(P) {
   const dist = (a, b) => V.filter(f => J(a[f]) !== J(b[f])).length;
   const near = O.map(o => O.filter(x => x !== o && dist(o, x) === 1).length);
   const far = O.map(o => O.reduce((s, x) => s + dist(o, x), 0));
-  const ink = O.map(o => V.reduce((s, f) => s + (INK[f] ? INK[f](o[f]) : 0), 0));
+  const ink = O.map(o => o.cuts !== undefined && o.cinv !== undefined ? cutArea(o.cuts, o.cinv) : V.reduce((s, f) => s + (INK[f] ? INK[f](o[f]) : 0), 0));
   const neg = a => a.map(x => -x);
   out['most typical'] = credit(typical, c);
   out['least typical (odd one out)'] = credit(neg(typical), c);
@@ -134,14 +142,14 @@ function gridAware(P) {
 // Each attribute is read the way a solver would read it: a position on a wheel (clock arithmetic), a plain
 // number, a set of marks, or one of a few named values. Attributes that pack two things into one figure
 // (shading and size of a figure, outer and inner shape) are split into their parts first.
-const WHEEL = { rot: 360, pos: 8, pos2: 8, hide: 5, mpos: 3, mir: 2, size: 3, hand: 8 };
+const WHEEL = { rot: 360, pos: 8, pos2: 8, hide: 5, mpos: 3, mir: 2, size: 3, hand: 8, cinv: 2, cdisc: 8 };
 // Attributes added after the freeze are only registered here, each under the kind a solver would read it as.
 // Rings of eight arcs: if the cell above is the diagonal cell's pattern turned, turn the left cell the same
 // way; otherwise treat the arcs as a set of marks.
 const RING8 = { ringo: 1, ringi: 1, ringc: 1 };
 const turn8 = (m, k) => ((m << k) | (m >> (8 - k))) & 255;
 const LINEAR = { count: 1, ngon: 1, sides: 1 };
-const MASK = { lines: 1, figs: 1, spokes: 1 };
+const MASK = { lines: 1, figs: 1, spokes: 1, cuts: 1 };
 const PARTS = {
   ma: x => [['name', Math.floor(x / 3)], ['wheel3', x % 3]], mb: x => [['name', Math.floor(x / 3)], ['wheel3', x % 3]], mc: x => [['name', Math.floor(x / 3)], ['wheel3', x % 3]],
   nest: x => [['name', Math.floor(x / 10)], ['name', x % 10]],
@@ -178,7 +186,7 @@ function measure(G, level, n, seed, mode, type) {
   G.seed(seed + level);
   const sum = { rules: 0, need: 0, wneed: 0, rndneed: 0, analogy: 0 }, opt = {}, grid = {}, single = {}, singleN = {};
   for (let i = 0; i < n; i++) {
-    const P = type === 'rings' ? G.genRings(level) : G.gen(level, null, mode === 'timed' ? { timed: 1 } : {});
+    const P = type === 'rings' ? G.genRings(level) : type === 'cutouts' ? G.genCut(level) : G.gen(level, null, mode === 'timed' ? { timed: 1 } : {});
     const d = difficulty(P);
     sum.rules += P.rules.length; sum.need += d.need; sum.wneed += d.wneed; sum.rndneed += d.rndneed; sum.analogy += analogy(P);
     const oo = optionOnly(P), ga = gridAware(P);
@@ -201,7 +209,7 @@ function run(o) {
   o = Object.assign({ n: 300, seed: 20261111, mode: 'timed', file: undefined }, o);
   const G = load(o.file);
   const rows = [];
-  for (let level = o.type === 'rings' ? 8 : 1; level <= G.MAXL; level++) rows.push(measure(G, level, o.n, o.seed, o.mode, o.type));
+  for (let level = o.type ? 8 : 1; level <= G.MAXL; level++) rows.push(measure(G, level, o.n, o.seed, o.mode, o.type));
   return rows;
 }
 
@@ -224,7 +232,7 @@ if (require.main === module) {
   if (val('--seed')) o.seed = +val('--seed');
   if (val('--mode')) o.mode = val('--mode');
   if (val('--file')) o.file = val('--file');
-  if (val('--type')) o.type = val('--type');   // 'rings': ring puzzles only, levels 8 to 10
+  if (val('--type')) o.type = val('--type');   // 'rings' or 'cutouts': that puzzle type only, levels 8 to 10
   const rows = run(o);
   if (arg.includes('--json')) console.log(JSON.stringify(rows, null, 1));
   else console.log(arg.includes('--md') ? markdown(rows) : text(rows));
