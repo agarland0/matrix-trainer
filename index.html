@@ -327,11 +327,12 @@ function assemble(ch,rules,level){
 function demo(feat,v,tp){OPTSTRICT=false;if(feat==='multi')return genMulti(v);for(let i=0;i<50;i++){const fs=feat==='pos2'?['pos','pos2']:feat==='mirrot'?['rot','mir']:[feat];
  const rules=fs.map(f=>{const u=Object.assign({feat:f,tier:'medium'},B[f](f==='pos'&&feat==='pos2'?'medium':'medium',f==='pos'&&feat==='pos2'?1:v));return tp?transpose(u):u});
  const P=assemble(fs,rules,0);if(P)return P}}
-const FOCUS={all:null,construction:['nest','build'],overlay:['lines','figs','build'],count:['count','sides'],rotation:['rot','mir'],movement:['pos','pos2','hide'],inner:['ishape','ifill']};const MINL={inner:5,multi:5,rings:8};
+const FOCUS={all:null,construction:['nest','build'],overlay:['lines','figs','build'],count:['count','sides'],rotation:['rot','mir'],movement:['pos','pos2','hide'],inner:['ishape','ifill']};const MINL={inner:5,multi:5,rings:8,cutouts:8};
 function gen(level,focus,opt){opt=opt||{};OPTSTRICT=true;
  if(MINL[focus]&&level<MINL[focus])level=MINL[focus];
  if(focus==='multi'||((!focus||focus==='all')&&level>=5&&Math.random()<MULTP[level])){const M=genMulti(level);if(M)return M}
  if(focus==='rings'||((!focus||focus==='all')&&level>=8&&Math.random()<RINGP[level])){const M=genRings(level);if(M)return M}
+ if(focus==='cutouts'||((!focus||focus==='all')&&level>=8&&Math.random()<CUTP[level])){const M=genCut(level);if(M)return M}
  const ff=focus&&FOCUS[focus];if(ff&&level<3&&!ff.some(f=>HAS[f].includes('easy')))level=3;
  const cfg=LV[level];
  for(let t=0;t<400;t++){
@@ -428,6 +429,29 @@ function genRings(level){level=Math.max(8,Math.min(MAXL,level));const keep=OPTST
  return null}finally{OPTSTRICT=keep}}
 
 
+// ---------- cutout puzzles: black and white regions built from five hidden base shapes ----------
+// A cell is black wherever an odd number of its base shapes overlap (circle, square, upright bar, flat bar, top
+// band), so there are no outlines to name: the shapes have to be recovered from the regions. Three hard rules:
+// regions combine by "black where exactly one is black" along rows, columns or both; the whole cell swaps black
+// and white on a pattern; and a small disc steps round eight edge positions, always in the opposite colour of
+// what it sits on. To apply the region rule a solver has to undo the swap first. Options are always the cube.
+const CUTP={8:.15,9:.2,10:.2};
+function genCut(level){level=Math.max(8,Math.min(MAXL,level));const keep=OPTSTRICT;OPTSTRICT=true;
+ try{for(let t=0;t<300;t++){
+  const dir=level>=9?pick(['both','row','col']):'both';
+  const reg=B.lines('hard','xor',5,dir);if([0,1,2].some(r=>[0,1,2].some(c=>reg.val(r,c)>31)))continue;
+  reg.text='Regions: '+(dir==='col'?'in each column, the bottom cell is black wherever exactly one of the top two cells is black':'in each row, cell 3 is black wherever exactly one of cells 1 and 2 is black')+'. Where both are black, or both white, it is white.'+(dir==='both'?' The same works down every column.':dir==='row'?' Only the rows do this.':' Only the columns do this.')+' Undo any black-white swap before you compare.';
+  const im=pick(['row','col','both']),i0=R(2);
+  const inv={cat:'Attribute change',val:im==='row'?(r,c)=>(i0+c)%2:im==='col'?(r,c)=>(i0+r)%2:(r,c)=>(i0+r+c)%2,mut:x=>[1-x],
+   text:'Swap: the whole cell trades black for white '+(im==='row'?'at each step along a row. Down a column it stays the same.':im==='col'?'at each step down a column. Along a row it stays the same.':'at each step along a row and at each step down a column.')+' The bottom corners show which state a cell is in.'};
+  const cs=pick([1,-1,2,-2,3,-3]),rs=pick([0,1,-1,2,-2]),p0=R(8);
+  const disc={cat:'Movement',val:(r,c)=>mod(p0+c*cs+r*rs,8),mut:x=>uniq([x+cs,x-cs,x+1,x-1,x+4].map(v=>mod(v,8))).filter(v=>v!==x),
+   text:`Edge disc: moves ${turnWord(cs,'position')} round the edge at each step along a row`+(rs?`, and ${turnWord(rs,'position')} at each step down a column.`:'. Down a column it stays put.')+' It is always drawn in the opposite colour of what it sits on.'};
+  const ch=['cuts','cinv','cdisc'],rules=[reg,inv,disc].map((u,i)=>Object.assign(u,{feat:ch[i],tier:'hard'}));
+  const P=assemble(ch,rules,level);if(!P)continue;
+  P.flags.shape=false;P.flags.cut=true;return P}
+ return null}finally{OPTSTRICT=keep}}
+
 // ---------- drawing ----------
 function shapeEl(s,cx,cy,r,fill,rot,stroke,mir){
  stroke=stroke||'#222';
@@ -456,8 +480,12 @@ function arcRing(mask,r,w){mask&=255;if(!mask)return'';const st=`fill="none" str
  let g=0;while(mask>>g&1)g++;let s='',i=1;   // start just after a gap so a run of arcs is never split in two
  while(i<=8){const k=(g+i)%8;if(mask>>k&1){let len=1;while(len<8&&(mask>>((k+len)%8)&1))len++;s+=`<path d="M${pt(k)}A${r} ${r} 0 ${len>4?1:0} 1 ${pt(k+len)}" ${st}/>`;i+=len}else i++}
  return s}
+const CUTS=['M17 50a33 33 0 1 0 66 0a33 33 0 1 0-66 0Z','M32 32H68V68H32Z','M41 4H59V96H41Z','M4 41H96V59H4Z','M0 0H100V41H0Z'];
+const CUTPOS=[[11,11],[50,11],[89,11],[89,50],[89,89],[50,89],[11,89],[11,50]];
 function cellSVG(c,f){
  let s='';
+ if(f.cut){let d='';for(let i=0;i<5;i++)if(c.cuts>>i&1)d+=CUTS[i];if(c.cinv)d+='M0 0H100V100H0Z';const [x,y]=CUTPOS[c.cdisc];
+  s+=`<path d="${d}M${x-5.5} ${y}a5.5 5.5 0 1 0 11 0a5.5 5.5 0 1 0-11 0Z" fill="#222" fill-rule="evenodd"/>`}
  if(f.rings){s+=arcRing(c.ringo,40,4.2)+arcRing(c.ringi,27,4.2);
   if(f.rings==='hand'){const a=(c.hand*45-67.5)*Math.PI/180;s+=`<line x1="50" y1="50" x2="${(50+16*Math.cos(a)).toFixed(1)}" y2="${(50+16*Math.sin(a)).toFixed(1)}" stroke="#222" stroke-width="3.4" stroke-linecap="round"/><circle cx="50" cy="50" r="3.6" fill="#222"/>`}
   else s+=arcRing(c.ringc,14,3.8)}
@@ -646,7 +674,7 @@ function rPractice(){
  main.innerHTML=`<div class="bar"><span class="pill">Level ${p.level}/${MAXL}</span>
  <span class="row"><button class="btn sm ghost" id="dn">−</button><button class="btn sm ${PR.auto?'':'ghost'}" id="au">Auto</button><button class="btn sm ghost" id="up">+</button></span>
  <span class="mute">${PR.ok}/${PR.n} right</span></div>
- <div class="bar"><span class="mute">Focus</span><select id="fc" style="flex:1;padding:6px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);font-size:14px">${[['all','All rules'],['overlay','Overlay (XOR, AND, subtraction)'],['construction','Construction (nesting, merge)'],['count','Count / arithmetic'],['rotation','Rotation'],['movement','Movement'],['inner','Inner element (inner shape and shading)'],['multi','Several separate figures'],['rings','Gapped rings']].map(([k,l])=>`<option value="${k}" ${PR.focus===k?'selected':''}>${l}</option>`).join('')}</select></div>
+ <div class="bar"><span class="mute">Focus</span><select id="fc" style="flex:1;padding:6px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);font-size:14px">${[['all','All rules'],['overlay','Overlay (XOR, AND, subtraction)'],['construction','Construction (nesting, merge)'],['count','Count / arithmetic'],['rotation','Rotation'],['movement','Movement'],['inner','Inner element (inner shape and shading)'],['multi','Several separate figures'],['rings','Gapped rings'],['cutouts','Cutouts']].map(([k,l])=>`<option value="${k}" ${PR.focus===k?'selected':''}>${l}</option>`).join('')}</select></div>
  <div class="card">${matrixHTML(p)}${optsHTML(p)}<div id="fb"></div></div>`;
  setTimeout(()=>{const f=document.getElementById('fc');if(f)f.onchange=()=>{PR.focus=f.value;PR.p=null;render()}});
  document.getElementById('dn').onclick=()=>{PR.level=Math.max(1,PR.level-1);PR.auto=false;PR.p=null;render()};

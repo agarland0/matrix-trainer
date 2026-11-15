@@ -41,6 +41,19 @@ Since v1.0, levels 8 to 10 also draw gapped-ring puzzles (about 12% to 16% of ti
 | Level 9 with rings in the mix | 3.91 | 2.37 | 6.66 | 3.37 | 19% | 41% | 78% |
 | Level 10 with rings in the mix | 4.05 | 2.42 | 6.82 | 3.51 | 21% | 40% | 78% |
 
+Levels 8 to 10 also draw cutout puzzles (black and white regions built from hidden base shapes), about 9% to 16% of timed puzzles there:
+
+| | Rules | need | wneed | rndneed | Best option-only shortcut | Best grid-aware shortcut | Three-cell analogy |
+|---|---|---|---|---|---|---|---|
+| Cutouts alone, level 8 | 3.00 | 2.39 | 7.16 | 2.75 | 19% | 25% | 64% |
+| Cutouts alone, level 9 | 3.00 | 2.39 | 7.17 | 2.75 | 20% | 24% | 63% |
+| Cutouts alone, level 10 | 3.00 | 2.44 | 7.32 | 2.78 | 22% | 24% | 60% |
+| Level 8 with rings and cutouts in the mix | 4.11 | 2.37 | 6.12 | 3.51 | 20% | 53% | 83% |
+| Level 9 with rings and cutouts in the mix | 3.73 | 2.40 | 6.81 | 3.27 | 20% | 37% | 76% |
+| Level 10 with rings and cutouts in the mix | 3.78 | 2.41 | 6.86 | 3.31 | 21% | 37% | 74% |
+
+On 2,000 puzzles per level the best option-only shortcut on cutouts is 19% to 20%. `node tools/checker.js --type cutouts` reproduces the first three rows.
+
 On 2,000 ring puzzles per level the best option-only shortcut is 20% at every level. `node tools/checker.js --type rings` reproduces the first three rows.
 
 How to read it:
