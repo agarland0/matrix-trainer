@@ -240,7 +240,7 @@ const CUBE={lv:5,cap:.2,lam:.3,fav:4,gh:.8};
 function cubeOptions(ans,rules,level,cells){
  const J=x=>JSON.stringify(x),TW={easy:1,medium:2,hard:3};
  const g8=cells.flat().slice(0,8),row3=[cells[2][0],cells[2][1]],col3=[cells[0][2],cells[1][2]];
- const NUMF={count:1,size:1,ngon:1,sides:1,lines:2,figs:2,spokes:2,ma:3,mb:3,mc:3};
+ const NUMF={count:1,size:1,ngon:1,sides:1,lines:2,figs:2,spokes:2,ringo:2,ringi:2,ringc:2,ma:3,mb:3,mc:3};
  const nv=(f,x)=>NUMF[f]===2?bits(x):NUMF[f]===3?x%3:f==='sides'?Math.abs(x):x;
  const prof=(f,x)=>[g8,row3,col3].map(S=>S.filter(c=>J(c[f])===J(x)).length);
  // per rule: wrong values whose grid profile matches the answer's, split by direction for numeric attributes
@@ -313,8 +313,8 @@ function assemble(ch,rules,level){
   const cells=[];for(let r=0;r<3;r++){cells.push([]);for(let c=0;c<3;c++){const x=Object.assign({},base);rules.forEach(u=>x[u.feat]=u.val(r,c));cells[r].push(x)}}
   const ans=cells[2][2];
   // overlay traps: the other combinations of the two source cells
-  rules.filter(u=>u.feat==='lines'||u.feat==='figs').forEach(u=>{const S_=u.src||[[2,0],[2,1]];const sa=u.val(...S_[0]),sb=u.val(...S_[1]);
-   const traps=[sa|sb,sa^sb,sa&sb,sa&~sb,sb&~sa].filter(v=>v&&v!==ans[u.feat]);const old=u.mut;u.mut=x=>uniq([...traps,...old(x)])});
+  rules.filter(u=>u.trap).forEach(u=>{const S_=u.src||[[2,0],[2,1]];const sa=u.val(...S_[0]),sb=u.val(...S_[1]);
+   const traps=uniq([sa|sb,sa^sb,sa&sb,sa&~sb,sb&~sa].filter(v=>v&&v!==ans[u.feat]));const old=u.mut;u.mut=u.srcOnly?()=>traps:x=>uniq([...traps,...old(x)])});
   const decoys=[];
   if(flags.shape){if(!ch.includes('fill'))decoys.push({feat:'fill',vals:[ans.fill,...FILLS.filter(v=>v!==ans.fill)]});
    if(!ch.includes('size'))decoys.push({feat:'size',vals:[ans.size,...[0,2].filter(v=>v!==ans.size)]});
@@ -327,10 +327,11 @@ function assemble(ch,rules,level){
 function demo(feat,v,tp){OPTSTRICT=false;if(feat==='multi')return genMulti(v);for(let i=0;i<50;i++){const fs=feat==='pos2'?['pos','pos2']:feat==='mirrot'?['rot','mir']:[feat];
  const rules=fs.map(f=>{const u=Object.assign({feat:f,tier:'medium'},B[f](f==='pos'&&feat==='pos2'?'medium':'medium',f==='pos'&&feat==='pos2'?1:v));return tp?transpose(u):u});
  const P=assemble(fs,rules,0);if(P)return P}}
-const FOCUS={all:null,construction:['nest','build'],overlay:['lines','figs','build'],count:['count','sides'],rotation:['rot','mir'],movement:['pos','pos2','hide'],inner:['ishape','ifill']};const MINL={inner:5,multi:5};
+const FOCUS={all:null,construction:['nest','build'],overlay:['lines','figs','build'],count:['count','sides'],rotation:['rot','mir'],movement:['pos','pos2','hide'],inner:['ishape','ifill']};const MINL={inner:5,multi:5,rings:8};
 function gen(level,focus,opt){opt=opt||{};OPTSTRICT=true;
  if(MINL[focus]&&level<MINL[focus])level=MINL[focus];
  if(focus==='multi'||((!focus||focus==='all')&&level>=5&&Math.random()<MULTP[level])){const M=genMulti(level);if(M)return M}
+ if(focus==='rings'||((!focus||focus==='all')&&level>=8&&Math.random()<RINGP[level])){const M=genRings(level);if(M)return M}
  const ff=focus&&FOCUS[focus];if(ff&&level<3&&!ff.some(f=>HAS[f].includes('easy')))level=3;
  const cfg=LV[level];
  for(let t=0;t<400;t++){
@@ -393,6 +394,40 @@ function genMulti(level){level=Math.max(5,Math.min(10,level));
   const keep=OPTSTRICT;if(level<7)OPTSTRICT=false;const P=assemble(['mpos','ma','mb','mc'],rules,level);OPTSTRICT=keep;if(P){P.flags.mshapes=shapes;return P}}
  return null}
 
+// ---------- ring puzzles: two rings of eight arcs, plus a clock hand or a third, innermost ring ----------
+// Each ring is eight arcs (bit 0 starts at 12 o'clock, going clockwise). Arcs that touch are drawn as one stroke,
+// so the eight units the rules work on are not visible: the solver has to impose them.
+// The outer ring is an overlay along rows or along columns. The inner ring turns as a whole pattern, or runs a
+// second overlay in the other direction. The third element steps (hand) or turns (innermost ring).
+// All three rules are hard tier, and the options are always the balanced cube. Ring overlays take their wrong
+// values only from the other combinations of the two source cells, and arcs count toward the ink balance.
+const RINGP={8:.15,9:.2,10:.2};
+const rol8=(m,k)=>{k=mod(k,8);return((m<<k)|(m>>(8-k)))&255};
+const turnWord=(k,unit)=>`${Math.abs(k)} ${unit}${cnt(Math.abs(k))} ${k>0?'clockwise':'counterclockwise'}`;
+function ringOverlay(label,dir,op){const u=B.lines('hard',op,8,dir);
+ const A=dir==='row'?['in each row','cell 3','cell 1','cell 2','cells 1 and 2']:['in each column','the bottom cell','the top cell','the middle cell','the top two cells'];
+ const body={xor:`${A[1]} keeps the arcs found in only one of ${A[4]}. Arcs found in both cancel out`,and:`${A[1]} keeps only the arcs found in both of ${A[4]}`,sub:`${A[1]} is ${A[2]} with every arc that is also in ${A[3]} removed`,rsub:`${A[1]} is ${A[3]} with every arc that is also in ${A[2]} removed (reversed subtraction)`}[op];
+ u.text=`${label}: ${A[0]}, ${body}. Only the ${dir==='row'?'rows':'columns'} do this. Arcs that touch are drawn as one stroke, so think in eighths of the circle.`;
+ u.srcOnly=true;return u}
+function ringTurn(label,sizes,avoid){let m;do{m=shuf([0,1,2,3,4,5,6,7]).slice(0,pick(sizes)).reduce((a,b)=>a|1<<b,0)}while([1,2,3,4,5,6,7].some(k=>rol8(m,k)===m));
+ let cs,rs;do{cs=pick([1,-1,2,-2,3,-3]);rs=pick([0,1,-1,2,-2])}while(avoid&&avoid[0]===cs&&avoid[1]===rs);
+ return{cat:'Rotation',step:[cs,rs],val:(r,c)=>rol8(m,c*cs+r*rs),text:`${label}: the whole pattern of arcs and gaps turns ${turnWord(cs,'eighth')} at each step along a row`+(rs?`, and ${turnWord(rs,'eighth')} at each step down a column.`:'. Down a column it stays the same.'),
+  mut:x=>[1,-1,2,-2,3,-3,4].map(k=>rol8(x,k))}}
+function handRule(){const cs=pick([1,-1,2,-2,3,-3]),rs=pick([0,1,-1,2,-2]),p0=R(8);
+ return{cat:'Movement',val:(r,c)=>mod(p0+c*cs+r*rs,8),text:`Hand: turns ${turnWord(cs,'position')} at each step along a row`+(rs?`, and ${turnWord(rs,'position')} at each step down a column.`:'. Down a column it stays the same.')+' There are eight positions.',
+  mut:x=>uniq([x+cs,x-cs,x+1,x-1,x+4].map(v=>mod(v,8))).filter(v=>v!==x)}}
+function genRings(level){level=Math.max(8,Math.min(MAXL,level));const keep=OPTSTRICT;OPTSTRICT=true;
+ try{for(let t=0;t<300;t++){
+  const ops=['sub','and','xor','rsub'],dir=pick(['row','col']),third=Math.random()<.6?'hand':'ringc';
+  const outer=ringOverlay('Outer ring',dir,pick(ops));
+  const inner=level>=9&&Math.random()<.5?ringOverlay('Inner ring',dir==='row'?'col':'row',pick(ops)):ringTurn('Inner ring',[4,5,5,6]);
+  const last=third==='hand'?handRule():ringTurn('Innermost ring',[3,4,5],inner.step);
+  const ch=['ringo','ringi',third],rules=[outer,inner,last].map((u,i)=>Object.assign(u,{feat:ch[i],tier:'hard'}));
+  const P=assemble(ch,rules,level);if(!P)continue;
+  P.flags.shape=false;P.flags.rings=third==='hand'?'hand':'core';return P}
+ return null}finally{OPTSTRICT=keep}}
+
+
 // ---------- drawing ----------
 function shapeEl(s,cx,cy,r,fill,rot,stroke,mir){
  stroke=stroke||'#222';
@@ -415,8 +450,17 @@ function shapeEl(s,cx,cy,r,fill,rot,stroke,mir){
   case'flag':return G(P([[-.62,-.95],[.75,-.95],[.75,-.35],[-.05,-.35],[-.05,.95],[-.62,.95]]));
  }
 }
+function arcRing(mask,r,w){mask&=255;if(!mask)return'';const st=`fill="none" stroke="#222" stroke-width="${w}"`;
+ if(mask===255)return`<circle cx="50" cy="50" r="${r}" ${st}/>`;
+ const pt=k=>{const a=(k*45-90)*Math.PI/180;return(50+r*Math.cos(a)).toFixed(1)+' '+(50+r*Math.sin(a)).toFixed(1)};
+ let g=0;while(mask>>g&1)g++;let s='',i=1;   // start just after a gap so a run of arcs is never split in two
+ while(i<=8){const k=(g+i)%8;if(mask>>k&1){let len=1;while(len<8&&(mask>>((k+len)%8)&1))len++;s+=`<path d="M${pt(k)}A${r} ${r} 0 ${len>4?1:0} 1 ${pt(k+len)}" ${st}/>`;i+=len}else i++}
+ return s}
 function cellSVG(c,f){
  let s='';
+ if(f.rings){s+=arcRing(c.ringo,40,4.2)+arcRing(c.ringi,27,4.2);
+  if(f.rings==='hand'){const a=(c.hand*45-67.5)*Math.PI/180;s+=`<line x1="50" y1="50" x2="${(50+16*Math.cos(a)).toFixed(1)}" y2="${(50+16*Math.sin(a)).toFixed(1)}" stroke="#222" stroke-width="3.4" stroke-linecap="round"/><circle cx="50" cy="50" r="3.6" fill="#222"/>`}
+  else s+=arcRing(c.ringc,14,3.8)}
  if(f.lines){const Y=y=>f.count?(14+(y-14)*.75).toFixed(1):y;for(let i=0;i<8;i++)if(c.lines>>i&1){const L=LINES[i];s+=`<line x1="${L[0]}" y1="${Y(L[1])}" x2="${L[2]}" y2="${Y(L[3])}" stroke="#222" stroke-width="3.2" stroke-linecap="round"/>`}}
  if(f.figs){const g=f.count?'<g transform="translate(12.5 0) scale(.75)">':'<g>';s+=g;for(let i=0;i<6;i++)if(c.figs>>i&1)s+=FIGS[i];s+='</g>'}
  if(f.multi&&f.mshapes){['ma','mb','mc'].forEach((k,i)=>{const v=c[k],[x,y]=MSLOT[(i+c.mpos)%3];s+=shapeEl(f.mshapes[i],x,y,MSZ[v%3],FILLS[Math.floor(v/3)],0)})}
@@ -602,7 +646,7 @@ function rPractice(){
  main.innerHTML=`<div class="bar"><span class="pill">Level ${p.level}/${MAXL}</span>
  <span class="row"><button class="btn sm ghost" id="dn">−</button><button class="btn sm ${PR.auto?'':'ghost'}" id="au">Auto</button><button class="btn sm ghost" id="up">+</button></span>
  <span class="mute">${PR.ok}/${PR.n} right</span></div>
- <div class="bar"><span class="mute">Focus</span><select id="fc" style="flex:1;padding:6px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);font-size:14px">${[['all','All rules'],['overlay','Overlay (XOR, AND, subtraction)'],['construction','Construction (nesting, merge)'],['count','Count / arithmetic'],['rotation','Rotation'],['movement','Movement'],['inner','Inner element (inner shape and shading)'],['multi','Several separate figures']].map(([k,l])=>`<option value="${k}" ${PR.focus===k?'selected':''}>${l}</option>`).join('')}</select></div>
+ <div class="bar"><span class="mute">Focus</span><select id="fc" style="flex:1;padding:6px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);font-size:14px">${[['all','All rules'],['overlay','Overlay (XOR, AND, subtraction)'],['construction','Construction (nesting, merge)'],['count','Count / arithmetic'],['rotation','Rotation'],['movement','Movement'],['inner','Inner element (inner shape and shading)'],['multi','Several separate figures'],['rings','Gapped rings']].map(([k,l])=>`<option value="${k}" ${PR.focus===k?'selected':''}>${l}</option>`).join('')}</select></div>
  <div class="card">${matrixHTML(p)}${optsHTML(p)}<div id="fb"></div></div>`;
  setTimeout(()=>{const f=document.getElementById('fc');if(f)f.onchange=()=>{PR.focus=f.value;PR.p=null;render()}});
  document.getElementById('dn').onclick=()=>{PR.level=Math.max(1,PR.level-1);PR.auto=false;PR.p=null;render()};

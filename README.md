@@ -30,6 +30,19 @@ All puzzles are generated. From level 5 up, the wrong answers are balanced so th
 
 These numbers are the baseline (v1.0, November 2026). Later changes to the puzzles are compared against this table, and the three-cell analogy solver is frozen so its column stays comparable.
 
+Since v1.0, levels 8 to 10 also draw gapped-ring puzzles (about 12% to 16% of timed puzzles there). Same seed and sample size:
+
+| | Rules | need | wneed | rndneed | Best option-only shortcut | Best grid-aware shortcut | Three-cell analogy |
+|---|---|---|---|---|---|---|---|
+| Gapped rings alone, level 8 | 3.00 | 2.41 | 7.22 | 2.75 | 20% | 28% | 64% |
+| Gapped rings alone, level 9 | 3.00 | 2.45 | 7.36 | 2.78 | 23% | 26% | 52% |
+| Gapped rings alone, level 10 | 3.00 | 2.39 | 7.16 | 2.75 | 20% | 24% | 50% |
+| Level 8 with rings in the mix | 4.27 | 2.34 | 5.97 | 3.60 | 18% | 59% | 84% |
+| Level 9 with rings in the mix | 3.91 | 2.37 | 6.66 | 3.37 | 19% | 41% | 78% |
+| Level 10 with rings in the mix | 4.05 | 2.42 | 6.82 | 3.51 | 21% | 40% | 78% |
+
+On 2,000 ring puzzles per level the best option-only shortcut is 20% at every level. `node tools/checker.js --type rings` reproduces the first three rows.
+
 How to read it:
 
 - **need** is the headline difficulty: the smallest number of rules you must work out before only the answer is left among the six options. **wneed** weights each rule by its tier (easy 1, medium 2, hard 3). **rndneed** is the count if you apply rules in random order; it flatters, so it is only shown next to need.
