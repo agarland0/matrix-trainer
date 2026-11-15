@@ -28,11 +28,13 @@ All puzzles are generated. From level 5 up, the wrong answers are balanced so th
 | 9 | 4.11 | 2.38 | 6.56 | 3.50 | 19% (most one-detail-off neighbours) | 45% (most values seen rarely in the grid) | 84% |
 | 10 | 4.16 | 2.42 | 6.84 | 3.58 | 21% (most one-detail-off neighbours) | 40% (most values seen rarely in the grid) | 84% |
 
+These numbers are the baseline (v1.0, November 2026). Later changes to the puzzles are compared against this table, and the three-cell analogy solver is frozen so its column stays comparable.
+
 How to read it:
 
 - **need** is the headline difficulty: the smallest number of rules you must work out before only the answer is left among the six options. **wneed** weights each rule by its tier (easy 1, medium 2, hard 3). **rndneed** is the count if you apply rules in random order; it flatters, so it is only shown next to need.
 - **Option-only shortcuts** look at the six options and nothing else: most typical, odd one out, most or least ink, most near-duplicates, the commonest or rarest value of one attribute, and so on. Chance is 1 in 6 (17%). From level 5 up the best of them stays near chance. Levels 1 to 4 use simpler options and do leak (up to 30%).
-- **Grid-aware shortcuts** also look at the grid without working out a rule. These are not at chance. The strongest picks the option whose values show up least in the grid, which amounts to solving "one of each per row" rules by counting.
+- **Grid-aware shortcuts** also look at the grid without working out a rule. These are not at chance. The strongest picks the option whose values show up least in the grid. It works only through attributes that take three values, each in three of the nine cells: the answer's value is then the one seen twice. Made blind to those attributes, the same strategy falls to 17%. So it is a way of solving "one of each" rules by counting, not a flaw in the options, but it does mean such a rule can be solved without understanding it.
 - **Three-cell analogy** uses only the three cells around the blank. It is real solving, not a trick, but a high rate means a puzzle can be done without reading the whole grid. It solves about 84% of level 9 and 10 puzzles today.
 
 Limits, stated plainly: with six options, about 2 to 3 rules can be forced, however many rules a puzzle has. The need column tops out near 2.4. Nobody has been measured on these puzzles, so the levels map to no outside score.
@@ -42,7 +44,7 @@ Run it yourself (Node 22 or newer, no install):
 ```
 node tools/checker.js            # the table above
 node tools/checker.js --all      # every shortcut tried, per level
-node --test tools/fingerprint.test.js   # generator fingerprint: fails if puzzles change unexpectedly
+node --test tools/*.test.js      # fails if puzzles change unexpectedly or the analogy solver drifts
 ```
 
 ## Run it locally

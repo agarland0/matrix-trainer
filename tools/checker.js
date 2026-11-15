@@ -128,6 +128,9 @@ function gridAware(P) {
 }
 
 // ---------- three-cell analogy ----------
+// FROZEN. The rates this solver produces are the baseline for comparing puzzle types, so do not change it.
+// tools/analogy.test.js replays saved puzzles to catch any drift. A stronger solver should be added beside
+// this one under a new name, with its own column.
 // Each attribute is read the way a solver would read it: a position on a wheel (clock arithmetic), a plain
 // number, a set of marks, or one of a few named values. Attributes that pack two things into one figure
 // (shading and size of a figure, outer and inner shape) are split into their parts first.
