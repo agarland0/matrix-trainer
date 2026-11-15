@@ -12,7 +12,7 @@
 //             "left cell, changed the way the diagonal changes into the cell above", pick the best match.
 //             This is real solving, not a tell. A high rate means the puzzle is easy.
 //
-// Usage: node tools/checker.js [--n 300] [--seed 20261111] [--mode timed|practice] [--md] [--gate]
+// Usage: node tools/checker.js [--n 300] [--seed 20261111] [--mode timed|practice] [--type rings] [--md] [--all] [--gate]
 //   --md    print a Markdown table (for the README)
 //   --gate  exit with an error if an option-only shortcut beats GATE at levels 5 to 10
 'use strict';
@@ -62,13 +62,13 @@ const digits4 = n => [0, 1, 2, 3].map(i => Math.floor(n / Math.pow(4, i)) % 4);
 // rough amount of drawn ink an attribute value adds
 const INK = {
   count: x => x, size: x => x, ngon: x => x, sides: x => Math.abs(x),
-  lines: bits, figs: bits, spokes: bits,
+  lines: bits, figs: bits, spokes: bits, ringo: bits, ringi: bits, ringc: bits,
   fill: x => DARK[x], ifill: x => DARK[x],
   build: x => digits4(x).filter(Boolean).length,
   nest: x => (x % 10 ? 1 : 0),
   ma: x => DARK[FILL4[Math.floor(x / 3)]] + x % 3, mb: x => DARK[FILL4[Math.floor(x / 3)]] + x % 3, mc: x => DARK[FILL4[Math.floor(x / 3)]] + x % 3,
 };
-const SIZE = { count: 1, size: 1, ngon: 1, sides: 1, lines: 1, figs: 1, spokes: 1 };
+const SIZE = { count: 1, size: 1, ngon: 1, sides: 1, lines: 1, figs: 1, spokes: 1, ringo: 1, ringi: 1, ringc: 1 };
 
 function optionOnly(P) {
   const O = P.opts, c = P.correct, out = {};
@@ -134,7 +134,12 @@ function gridAware(P) {
 // Each attribute is read the way a solver would read it: a position on a wheel (clock arithmetic), a plain
 // number, a set of marks, or one of a few named values. Attributes that pack two things into one figure
 // (shading and size of a figure, outer and inner shape) are split into their parts first.
-const WHEEL = { rot: 360, pos: 8, pos2: 8, hide: 5, mpos: 3, mir: 2, size: 3 };
+const WHEEL = { rot: 360, pos: 8, pos2: 8, hide: 5, mpos: 3, mir: 2, size: 3, hand: 8 };
+// Attributes added after the freeze are only registered here, each under the kind a solver would read it as.
+// Rings of eight arcs: if the cell above is the diagonal cell's pattern turned, turn the left cell the same
+// way; otherwise treat the arcs as a set of marks.
+const RING8 = { ringo: 1, ringi: 1, ringc: 1 };
+const turn8 = (m, k) => ((m << k) | (m >> (8 - k))) & 255;
 const LINEAR = { count: 1, ngon: 1, sides: 1 };
 const MASK = { lines: 1, figs: 1, spokes: 1 };
 const PARTS = {
@@ -147,6 +152,7 @@ const wrap = (x, n) => ((x % n) + n) % n;
 function predict(kind, d, a, l) {
   if (kind === 'linear') return v => v === l + a - d;
   if (kind === 'mask') return v => v === (l ^ d ^ a);
+  if (kind === 'ring8') { for (let k = 1; k < 8; k++) if (turn8(d, k) === a && turn8(d, k) !== d) return v => v === turn8(l, k); return v => v === (l ^ d ^ a); }
   if (kind.startsWith('wheel')) { const n = +kind.slice(5); return v => v === wrap(l + a - d, n); }
   // named values, treated as a cycle of three: same change applied to the left cell
   if (J(d) === J(a)) return v => J(v) === J(l);
@@ -159,7 +165,7 @@ function analogy(P) {
   const V = Object.keys(O[0]).filter(f => O.some(o => J(o[f]) !== J(O[0][f])));
   const scores = O.map(() => 0);
   for (const f of V) {
-    const split = PARTS[f] || (x => [[WHEEL[f] ? 'wheel' + WHEEL[f] : LINEAR[f] ? 'linear' : MASK[f] ? 'mask' : 'name', x]]);
+    const split = PARTS[f] || (x => [[WHEEL[f] ? 'wheel' + WHEEL[f] : LINEAR[f] ? 'linear' : MASK[f] ? 'mask' : RING8[f] ? 'ring8' : 'name', x]]);
     const D = split(diag[f]), A = split(above[f]), L = split(left[f]);
     const tests = D.map((p, i) => predict(p[0], p[1], A[i][1], L[i][1]));
     O.forEach((o, i) => { if (split(o[f]).every((p, k) => tests[k](p[1]))) scores[i]++; });
@@ -168,11 +174,11 @@ function analogy(P) {
 }
 
 // ---------- run ----------
-function measure(G, level, n, seed, mode) {
+function measure(G, level, n, seed, mode, type) {
   G.seed(seed + level);
   const sum = { rules: 0, need: 0, wneed: 0, rndneed: 0, analogy: 0 }, opt = {}, grid = {}, single = {}, singleN = {};
   for (let i = 0; i < n; i++) {
-    const P = G.gen(level, null, mode === 'timed' ? { timed: 1 } : {});
+    const P = type === 'rings' ? G.genRings(level) : G.gen(level, null, mode === 'timed' ? { timed: 1 } : {});
     const d = difficulty(P);
     sum.rules += P.rules.length; sum.need += d.need; sum.wneed += d.wneed; sum.rndneed += d.rndneed; sum.analogy += analogy(P);
     const oo = optionOnly(P), ga = gridAware(P);
@@ -195,7 +201,7 @@ function run(o) {
   o = Object.assign({ n: 300, seed: 20261111, mode: 'timed', file: undefined }, o);
   const G = load(o.file);
   const rows = [];
-  for (let level = 1; level <= G.MAXL; level++) rows.push(measure(G, level, o.n, o.seed, o.mode));
+  for (let level = o.type === 'rings' ? 8 : 1; level <= G.MAXL; level++) rows.push(measure(G, level, o.n, o.seed, o.mode, o.type));
   return rows;
 }
 
@@ -218,6 +224,7 @@ if (require.main === module) {
   if (val('--seed')) o.seed = +val('--seed');
   if (val('--mode')) o.mode = val('--mode');
   if (val('--file')) o.file = val('--file');
+  if (val('--type')) o.type = val('--type');   // 'rings': ring puzzles only, levels 8 to 10
   const rows = run(o);
   if (arg.includes('--json')) console.log(JSON.stringify(rows, null, 1));
   else console.log(arg.includes('--md') ? markdown(rows) : text(rows));

@@ -27,11 +27,12 @@ function load(file) {
   if (a < 0 || b < 0 || b < a) throw new Error('Could not find the generator section in ' + file);
   const ctx = vm.createContext({ window: {}, __rand: Math.random });
   vm.runInContext('Math.random=()=>__rand();', ctx);
-  vm.runInContext(html.slice(a, b) + '\n;globalThis.__api={gen,genMulti,LV,HAS,MAXL};', ctx, { filename: 'index.html#generator' });
+  vm.runInContext(html.slice(a, b) + '\n;globalThis.__api={gen,genMulti,LV,HAS,MAXL,genRings:typeof genRings==="function"?genRings:null};', ctx, { filename: 'index.html#generator' });
   const api = ctx.__api;
   return {
     gen: api.gen,
     genMulti: api.genMulti,
+    genRings: api.genRings,
     LV: api.LV,
     HAS: api.HAS,
     MAXL: api.MAXL,
