@@ -2,7 +2,7 @@
 
 A free practice tool for 3×3 matrix reasoning puzzles. Not an IQ test, not a diagnostic, and not prep for any specific test. It gives no scores beyond your own results on its puzzles.
 
-**Play it:** https://agarland0.github.io/matrix-trainer/
+**Play it:** https://matrix-trainer-app.github.io/matrix-trainer/
 
 - **Learn:** the rule types, with worked examples.
 - **Practice:** untimed puzzles at levels 1 to 10, rules shown after each answer.
